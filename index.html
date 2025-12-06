@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BikeCare Workshop CRM</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -26,6 +27,14 @@
         }
         .toast {
             animation: slideIn 0.3s ease-out forwards;
+        }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        th.sortable:hover {
+            background-color: #f3f4f6;
         }
     </style>
 </head>
@@ -51,7 +60,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v2.2 (Vanilla)
+            BikeCare v2.4 (Vanilla)
         </div>
     </aside>
 
@@ -73,7 +82,7 @@
             <div id="view-dashboard" class="view-section active">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold text-gray-800">דשבורד ניהולי</h2>
-                    <button onclick="router.navigate('create-ticket')" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                    <button onclick="app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
                         <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
                     </button>
                 </div>
@@ -125,13 +134,13 @@
             <div id="view-tickets" class="view-section">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h2 class="text-2xl font-bold text-gray-800">ניהול תיקונים</h2>
-                    <button onclick="router.navigate('create-ticket')" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
+                    <button onclick="app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
                         <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
                     </button>
                 </div>
 
-                <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
-                    <div class="relative flex-1">
+                <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4 flex-wrap">
+                    <div class="relative flex-1 min-w-[200px]">
                         <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
                         <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם או מספר..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
@@ -145,6 +154,12 @@
                             <option value="completed">הושלם</option>
                             <option value="cancelled">בוטל</option>
                         </select>
+                        <select id="priority-filter" class="border rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="all">כל הדחיפויות</option>
+                            <option value="normal">רגיל</option>
+                            <option value="high">גבוה</option>
+                            <option value="urgent">דחוף</option>
+                        </select>
                     </div>
                 </div>
 
@@ -153,13 +168,25 @@
                         <table class="w-full text-right">
                             <thead class="bg-gray-50 text-gray-600 border-b">
                                 <tr>
-                                    <th class="p-4 w-20">#</th>
-                                    <th class="p-4">לקוח</th>
+                                    <th class="p-4 w-24 sortable" onclick="app.handleSort('ticketNumber')">
+                                        <div class="flex items-center gap-1"># <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-ticketNumber"></i></div>
+                                    </th>
+                                    <th class="p-4 sortable" onclick="app.handleSort('customerName')">
+                                        <div class="flex items-center gap-1">לקוח <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-customerName"></i></div>
+                                    </th>
                                     <th class="p-4 hidden md:table-cell">טלפון</th>
-                                    <th class="p-4">דגם אופניים</th>
-                                    <th class="p-4">סטטוס</th>
-                                    <th class="p-4 hidden md:table-cell">דחיפות</th>
-                                    <th class="p-4">תאריך קבלה</th>
+                                    <th class="p-4 sortable" onclick="app.handleSort('bikeModel')">
+                                        <div class="flex items-center gap-1">דגם <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-bikeModel"></i></div>
+                                    </th>
+                                    <th class="p-4 sortable" onclick="app.handleSort('status')">
+                                        <div class="flex items-center gap-1">סטטוס <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-status"></i></div>
+                                    </th>
+                                    <th class="p-4 hidden md:table-cell sortable" onclick="app.handleSort('priority')">
+                                        <div class="flex items-center gap-1">דחיפות <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-priority"></i></div>
+                                    </th>
+                                    <th class="p-4 sortable" onclick="app.handleSort('createdAt')">
+                                        <div class="flex items-center gap-1">תאריך <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-createdAt"></i></div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody id="tickets-table-body" class="divide-y divide-gray-100">
@@ -257,6 +284,11 @@
                         <tbody id="customers-table-body" class="divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Customer Detail View (New) -->
+            <div id="view-customer-detail" class="view-section h-full">
+                <!-- Content injected by JS -->
             </div>
 
         </div> <!-- End Content Area -->
