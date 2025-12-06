@@ -38,6 +38,23 @@
         th.sortable:hover {
             background-color: #f3f4f6;
         }
+        
+        /* Tabs Styling */
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: #2563eb;
+            background-color: #f9fafb;
+        }
+        .tab-btn.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
@@ -62,7 +79,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v2.5 (Supabase)
+            BikeCare v2.9 (No AI)
         </div>
     </aside>
 
@@ -301,8 +318,8 @@
 
 <script>
     // --- הגדרות Supabase ---
-    const supabaseUrl = 'https://czxicysnfwvxapipzysg.supabase.co'; // הכתובת שלך מהתמונה
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6eGljeXNuZnd2eGFwaXB6eXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDY3MTYsImV4cCI6MjA4MDYyMjcxNn0.cgk7AxkRzkptv0lzj-63J2vBqj1dqB3OCk5qeq9BQqo'; // !!! קח את ה-anon key מהגדרות API ב-Supabase !!!
+    const supabaseUrl = 'https://czxicysnfwvxapipzysg.supabase.co'; 
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6eGljeXNuZnd2eGFwaXB6eXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDY3MTYsImV4cCI6MjA4MDYyMjcxNn0.cgk7AxkRzkptv0lzj-63J2vBqj1dqB3OCk5qeq9BQqo';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Utils ---
@@ -312,7 +329,7 @@
             if(!dateStr) return '';
             return new Date(dateStr).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
         },
-        id: () => crypto.randomUUID(), // שימוש במזהה ייחודי אמיתי
+        id: () => crypto.randomUUID(), 
         showToast: (msg, type='success') => {
             const container = document.getElementById('toast-container');
             const el = document.createElement('div');
@@ -376,6 +393,7 @@
         currentTicket: null,
         currentCustomer: null,
         sortState: { field: 'createdAt', dir: 'desc' }, // State for sorting
+        activeTicketTab: 'details', // 'details' or 'history'
 
         init: async () => {
             // טעינה ראשונית - עכשיו זה אסינכרוני
@@ -388,10 +406,8 @@
             setInterval(async () => {
                 if(document.visibilityState === 'visible') {
                     const freshData = await DB.getAll();
-                    // עדכון עדין רק אם יש שינוי במספר השורות או משהו קריטי
                     if (freshData.length !== app.tickets.length) {
                           app.tickets = freshData;
-                          // רענון המסך הנוכחי אם צריך
                           const currentView = document.querySelector('.view-section.active').id;
                           if(currentView === 'view-dashboard') app.renderDashboard();
                           if(currentView === 'view-tickets') app.renderTickets();
@@ -432,13 +448,31 @@
             });
         },
 
+        // Sorting Helper
+        handleSort: (field) => {
+            if (app.sortState.field === field) {
+                // Toggle direction
+                app.sortState.dir = app.sortState.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New field, default to asc
+                app.sortState.field = field;
+                app.sortState.dir = 'asc';
+            }
+            app.renderTickets();
+        },
+
+        getPriorityValue: (p) => {
+            const map = { 'normal': 1, 'high': 2, 'urgent': 3 };
+            return map[p] || 0;
+        },
+
         // New Ticket Navigation Helper
         openCreateTicket: (prefillData = null) => {
             router.navigate('create-ticket');
             const form = document.getElementById('create-ticket-form');
-            form.reset();
+            if(form) form.reset();
             
-            if (prefillData) {
+            if (prefillData && form) {
                 if(prefillData.name) form.querySelector('[name="customerName"]').value = prefillData.name;
                 if(prefillData.phone) form.querySelector('[name="customerPhone"]').value = prefillData.phone;
                 if(prefillData.email) form.querySelector('[name="customerEmail"]').value = prefillData.email;
@@ -467,6 +501,22 @@
             Utils.showToast('נתונים נטענו בהצלחה');
         },
 
+        deleteTicket: () => {
+            if(confirm("האם למחוק את התיקון לצמיתות?")) {
+                const deleteAsync = async () => {
+                    const { error } = await supabase.from('tickets').delete().eq('id', app.currentTicket.id);
+                    if(!error) {
+                        app.tickets = await DB.getAll();
+                        Utils.showToast("התיקון נמחק");
+                        router.navigate('tickets');
+                    } else {
+                        Utils.showToast("שגיאה במחיקה", "error");
+                    }
+                };
+                deleteAsync();
+            }
+        },
+
         renderDashboard: () => {
             const t = app.tickets;
             document.getElementById('stat-total').innerText = t.length;
@@ -492,14 +542,51 @@
             
             const search = searchInput.value.toLowerCase();
             const filter = document.getElementById('tickets-filter').value;
+            const priorityFilter = document.getElementById('priority-filter').value;
             
-            const filtered = app.tickets.filter(t => {
+            let filtered = app.tickets.filter(t => {
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
                                     (t.ticketNumber || '').toString().includes(search) ||
                                     (t.bikeModel || '').toLowerCase().includes(search);
                 const matchFilter = filter === 'all' || t.status === filter;
-                return matchSearch && matchFilter;
+                const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
+                return matchSearch && matchFilter && matchPriority;
             });
+
+            // Sorting Logic
+            const { field, dir } = app.sortState;
+            filtered.sort((a, b) => {
+                let valA = a[field];
+                let valB = b[field];
+
+                // Special handling
+                if (field === 'priority') {
+                    valA = app.getPriorityValue(valA);
+                    valB = app.getPriorityValue(valB);
+                } else if (field === 'createdAt') {
+                    valA = new Date(valA);
+                    valB = new Date(valB);
+                } else if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = valB.toLowerCase();
+                }
+
+                if (valA < valB) return dir === 'asc' ? -1 : 1;
+                if (valA > valB) return dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update Header Icons
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.setAttribute('data-lucide', 'arrow-up-down');
+                icon.classList.remove('text-blue-600');
+            });
+            const activeIcon = document.getElementById(`sort-icon-${field}`);
+            if (activeIcon) {
+                activeIcon.setAttribute('data-lucide', dir === 'asc' ? 'arrow-up' : 'arrow-down');
+                activeIcon.classList.add('text-blue-600');
+            }
+            lucide.createIcons();
 
             const tbody = document.getElementById('tickets-table-body');
             if (filtered.length === 0) {
@@ -560,7 +647,6 @@
         },
 
         openCustomer: (phone) => {
-            // Find latest customer details
             const tickets = app.tickets.filter(t => t.customerPhone === phone).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
             if(tickets.length === 0) return;
             const latest = tickets[0];
@@ -630,8 +716,81 @@
             const ticket = app.tickets.find(t => t.id === id);
             if(!ticket) return;
             app.currentTicket = ticket;
-            
+            app.activeTicketTab = 'details'; // reset tab
+            app.renderTicketDetail();
+            router.navigate('ticket-detail');
+        },
+
+        switchTicketTab: (tabName) => {
+            app.activeTicketTab = tabName;
+            app.renderTicketDetail();
+        },
+
+        renderTicketDetail: () => {
+            const ticket = app.currentTicket;
+            const customerHistory = app.tickets.filter(t => t.customerPhone === ticket.customerPhone && t.id !== ticket.id);
             const container = document.getElementById('view-ticket-detail');
+            
+            const detailsContent = `
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">הצעת מחיר</h3>
+                    <div class="flex gap-2">
+                        <button onclick="app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button>
+                        <button onclick="app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
+                    </div>
+                </div>
+                <div class="bg-white border rounded-lg overflow-hidden mb-6">
+                    <table class="w-full text-right text-sm" id="quote-table">
+                        <thead class="bg-gray-50 border-b">
+                            <tr><th class="p-3">תיאור</th><th class="p-3 w-20">כמות</th><th class="p-3 w-24">מחיר</th><th class="p-3 w-24">סה״כ</th><th class="p-3 w-10"></th></tr>
+                        </thead>
+                        <tbody id="quote-items-body"></tbody>
+                        <tfoot class="bg-gray-50">
+                            <tr><td colspan="5" class="p-2 text-center"><button onclick="app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
+                        </tfoot>
+                    </table>
+                    <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
+                        <span>סה״כ לתשלום:</span>
+                        <span id="quote-total">0.00 ₪</span>
+                    </div>
+                </div>
+                <!-- Signature -->
+                <div class="border rounded-lg p-4 bg-gray-50">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
+                    <div id="signature-area">
+                        ${ticket.quote.isSigned 
+                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
+                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
+                               <button onclick="app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
+                        }
+                    </div>
+                </div>
+            `;
+
+            const historyContent = `
+                <div class="space-y-3 mt-4">
+                    ${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}
+                    ${customerHistory.map(t => `
+                        <div onclick="app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span>
+                                    <span class="font-medium text-gray-800">${t.bikeModel}</span>
+                                </div>
+                                <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
+                            </div>
+                            <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                ${app.getStatusBadge(t.status)}
+                                <div class="text-xs text-gray-500 flex items-center gap-1">
+                                    <i data-lucide="calendar" class="w-3"></i>
+                                    ${Utils.formatDate(t.createdAt).split(',')[0]}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
             container.innerHTML = `
                 <div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg">
                     <div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto">
@@ -653,83 +812,93 @@
                         <div class="space-y-4">
                             <div class="bg-white p-4 rounded border">
                                 <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3>
-                                <div class="text-lg font-medium">${ticket.customerName}</div>
+                                <div class="text-lg font-medium cursor-pointer text-blue-600 hover:underline" onclick="app.openCustomer('${ticket.customerPhone}')">${ticket.customerName}</div>
                                 <div class="text-gray-600 text-sm">${ticket.customerPhone}</div>
+                                <div class="text-gray-600 text-sm">${ticket.customerEmail || ''}</div>
                             </div>
                             <div class="bg-white p-4 rounded border">
                                 <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3>
                                 <div class="font-medium">${ticket.bikeModel}</div>
                                 <div class="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">${ticket.issueDescription}</div>
                             </div>
+                            
+                            <button onclick="app.deleteTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100 mt-2">
+                                <i data-lucide="trash-2" class="w-4"></i> מחק תיקון
+                            </button>
                         </div>
                     </div>
-                    <div class="w-full md:w-2/3 bg-white flex flex-col p-6 overflow-y-auto">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold">הצעת מחיר</h3>
-                            <div class="flex gap-2">
-                                <button onclick="app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button>
-                                <button onclick="app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
-                            </div>
+                    <div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden">
+                        <!-- Tabs -->
+                        <div class="flex border-b bg-gray-50">
+                            <button onclick="app.switchTicketTab('details')" class="tab-btn flex-1 ${app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button>
+                            <button onclick="app.switchTicketTab('history')" class="tab-btn flex-1 ${app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח (${customerHistory.length})</button>
                         </div>
-                        <div class="bg-white border rounded-lg overflow-hidden mb-6">
-                            <table class="w-full text-right text-sm" id="quote-table">
-                                <thead class="bg-gray-50 border-b">
-                                    <tr><th class="p-3">תיאור</th><th class="p-3 w-20">כמות</th><th class="p-3 w-24">מחיר</th><th class="p-3 w-24">סה״כ</th><th class="p-3 w-10"></th></tr>
-                                </thead>
-                                <tbody id="quote-items-body"></tbody>
-                                <tfoot class="bg-gray-50">
-                                    <tr><td colspan="5" class="p-2 text-center"><button onclick="app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
-                                </tfoot>
-                            </table>
-                            <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
-                                <span>סה״כ לתשלום:</span>
-                                <span id="quote-total">0.00 ₪</span>
-                            </div>
+                        <div class="p-6 overflow-y-auto h-full">
+                            ${app.activeTicketTab === 'details' ? detailsContent : historyContent}
                         </div>
                     </div>
                 </div>
             `;
             
-            router.navigate('ticket-detail');
             lucide.createIcons();
-            app.renderQuoteItems();
+            if(app.activeTicketTab === 'details') {
+                app.renderQuoteItems();
+                if(!ticket.quote.isSigned) app.initCanvas();
+            }
         },
 
         renderQuoteItems: () => {
             const tbody = document.getElementById('quote-items-body');
+            // If tab is not details or element missing, stop
+            if(!tbody) return; 
+            
             const items = app.currentTicket.quote.items || [];
             
+            // Render rows once
             tbody.innerHTML = items.map((item, idx) => `
-                <tr>
+                <tr id="quote-row-${idx}">
                     <td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="app.updateQuoteItem(${idx}, 'description', this.value)"></td>
                     <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="app.updateQuoteItem(${idx}, 'quantity', this.value)"></td>
                     <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="app.updateQuoteItem(${idx}, 'price', this.value)"></td>
-                    <td class="p-2">${Utils.formatCurrency(item.quantity * item.price)}</td>
+                    <td class="p-2 row-total">${Utils.formatCurrency(item.quantity * item.price)}</td>
                     <td class="p-2 text-center"><button onclick="app.removeQuoteItem(${idx})" class="text-red-500"><i data-lucide="x" class="w-4"></i></button></td>
                 </tr>
             `).join('');
             
-            const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
-            app.currentTicket.quote.total = total;
-            document.getElementById('quote-total').innerText = Utils.formatCurrency(total);
+            app.updateQuoteTotal();
             lucide.createIcons();
         },
 
         updateQuoteItem: (idx, field, val) => {
             const item = app.currentTicket.quote.items[idx];
             item[field] = field === 'description' ? val : parseFloat(val) || 0;
-            app.renderQuoteItems();
+            
+            if (field !== 'description') {
+                const row = document.getElementById(`quote-row-${idx}`);
+                if(row) {
+                    row.querySelector('.row-total').innerText = Utils.formatCurrency(item.quantity * item.price);
+                }
+            }
+            app.updateQuoteTotal();
+        },
+
+        updateQuoteTotal: () => {
+             const items = app.currentTicket.quote.items;
+             const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+             app.currentTicket.quote.total = total;
+             const totalEl = document.getElementById('quote-total');
+             if(totalEl) totalEl.innerText = Utils.formatCurrency(total);
         },
 
         addQuoteItem: () => {
             if(!app.currentTicket.quote.items) app.currentTicket.quote.items = [];
             app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0 });
-            app.renderQuoteItems();
+            app.renderQuoteItems(); // כאן חייבים רינדור מלא
         },
 
         removeQuoteItem: (idx) => {
             app.currentTicket.quote.items.splice(idx, 1);
-            app.renderQuoteItems();
+            app.renderQuoteItems(); // כאן חייבים רינדור מלא
         },
 
         saveQuote: async () => {
@@ -740,16 +909,70 @@
         updateStatus: async (newStatus) => {
             app.currentTicket.status = newStatus;
             await DB.update(app.currentTicket.id, { status: newStatus });
-            app.openTicket(app.currentTicket.id);
-            // רענון הרשימה הראשית ברקע
-            app.tickets = await DB.getAll();
+            // Re-render only necessary parts or full view
+            app.tickets = await DB.getAll(); // Refresh global list
+            app.renderTicketDetail(); // Refresh Detail View to update sidebar
             Utils.showToast('סטטוס עודכן');
         },
 
+        // Canvas Logic
+        initCanvas: () => {
+            const canvas = document.getElementById('sig-canvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            let isDrawing = false;
+            
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                return {x, y};
+            }
+
+            const start = (e) => { isDrawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
+            const move = (e) => { 
+                if(!isDrawing) return; 
+                e.preventDefault(); 
+                const {x,y} = getPos(e); 
+                ctx.lineTo(x,y); 
+                ctx.stroke(); 
+            };
+            const end = () => { isDrawing = false; };
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            canvas.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start);
+            canvas.addEventListener('touchmove', move);
+            canvas.addEventListener('touchend', end);
+        },
+
+        saveSignature: () => {
+            const canvas = document.getElementById('sig-canvas');
+            const dataUrl = canvas.toDataURL();
+            app.currentTicket.quote.isSigned = true;
+            app.currentTicket.quote.signature = dataUrl;
+            app.currentTicket.quote.signedAt = new Date().toISOString();
+            app.saveQuote();
+            app.renderTicketDetail();
+        },
+
+        clearSignature: () => {
+            app.currentTicket.quote.isSigned = false;
+            app.currentTicket.quote.signature = null;
+            app.saveQuote();
+            app.renderTicketDetail();
+        },
+
+        // PDF Print
         printTicket: () => {
             window.print();
         },
 
+        // Helpers
         getStatusBadge: (status, textOnly = false) => {
             const s = STATUSES[status] || STATUSES.new;
             if(textOnly) return s.label;
@@ -771,12 +994,13 @@
         urgent: { label: 'דחוף' }
     };
 
+    // --- Router ---
     const router = {
         navigate: (target) => {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            const view = document.getElementById(`view-${target}`);
-            if(view) view.classList.add('active');
+            document.getElementById(`view-${target}`).classList.add('active');
             
+            // Highlight sidebar nav
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 if(btn.dataset.target === target) btn.classList.add('bg-blue-50', 'text-blue-700');
                 else btn.classList.remove('bg-blue-50', 'text-blue-700');
@@ -788,9 +1012,11 @@
         }
     };
 
+    // Init
     window.onload = () => {
         app.init();
     };
+
 </script>
 </body>
 </html>
