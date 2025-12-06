@@ -79,7 +79,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v2.9 (No AI)
+            BikeCare v3.7 (Fixed Print Bug)
         </div>
     </aside>
 
@@ -479,28 +479,6 @@
             }
         },
 
-        addDemoData: async () => {
-            if(!confirm("פעולה זו תוסיף נתונים לשרת האמיתי. להמשיך?")) return;
-            Utils.showToast('טוען נתונים...');
-            
-            const demo = [
-                { customerName: "דני כהן", customerPhone: "050-1234567", customerEmail: "dani@test.com", bikeModel: "Trek Marlin 6", issueDescription: "פנצ'ר בגלגל אחורי", status: "new", priority: "normal" },
-                { customerName: "רונית לוי", customerPhone: "052-9876543", customerEmail: "ronit@test.com", bikeModel: "Specialized Sirrus", issueDescription: "טיפול 10,000", status: "in_progress", priority: "high" }
-            ];
-            
-            for (const t of demo) {
-                await DB.add({
-                    ...t,
-                    ticketNumber: Math.floor(1000 + Math.random() * 9000),
-                    quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
-                });
-            }
-            
-            app.tickets = await DB.getAll();
-            app.renderDashboard();
-            Utils.showToast('נתונים נטענו בהצלחה');
-        },
-
         deleteTicket: () => {
             if(confirm("האם למחוק את התיקון לצמיתות?")) {
                 const deleteAsync = async () => {
@@ -717,8 +695,8 @@
             if(!ticket) return;
             app.currentTicket = ticket;
             app.activeTicketTab = 'details'; // reset tab
-            app.renderTicketDetail();
-            router.navigate('ticket-detail');
+            router.navigate('ticket-detail'); // Navigate FIRST to ensure element is visible
+            app.renderTicketDetail(); // Then render contents into it
         },
 
         switchTicketTab: (tabName) => {
@@ -742,11 +720,18 @@
                 <div class="bg-white border rounded-lg overflow-hidden mb-6">
                     <table class="w-full text-right text-sm" id="quote-table">
                         <thead class="bg-gray-50 border-b">
-                            <tr><th class="p-3">תיאור</th><th class="p-3 w-20">כמות</th><th class="p-3 w-24">מחיר</th><th class="p-3 w-24">סה״כ</th><th class="p-3 w-10"></th></tr>
+                            <tr>
+                                <th class="p-3 w-10 text-center">בוצע</th>
+                                <th class="p-3">תיאור</th>
+                                <th class="p-3 w-20">כמות</th>
+                                <th class="p-3 w-24">מחיר</th>
+                                <th class="p-3 w-24">סה״כ</th>
+                                <th class="p-3 w-10"></th>
+                            </tr>
                         </thead>
                         <tbody id="quote-items-body"></tbody>
                         <tfoot class="bg-gray-50">
-                            <tr><td colspan="5" class="p-2 text-center"><button onclick="app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
+                            <tr><td colspan="6" class="p-2 text-center"><button onclick="app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
                         </tfoot>
                     </table>
                     <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
@@ -849,14 +834,17 @@
 
         renderQuoteItems: () => {
             const tbody = document.getElementById('quote-items-body');
-            // If tab is not details or element missing, stop
             if(!tbody) return; 
             
             const items = app.currentTicket.quote.items || [];
             
-            // Render rows once
             tbody.innerHTML = items.map((item, idx) => `
                 <tr id="quote-row-${idx}">
+                    <td class="p-2 text-center">
+                        <input type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" 
+                            ${item.completed ? 'checked' : ''} 
+                            onchange="app.toggleQuoteItemCompletion(${idx})">
+                    </td>
                     <td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="app.updateQuoteItem(${idx}, 'description', this.value)"></td>
                     <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="app.updateQuoteItem(${idx}, 'quantity', this.value)"></td>
                     <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="app.updateQuoteItem(${idx}, 'price', this.value)"></td>
@@ -882,6 +870,12 @@
             app.updateQuoteTotal();
         },
 
+        toggleQuoteItemCompletion: (idx) => {
+            const item = app.currentTicket.quote.items[idx];
+            item.completed = !item.completed;
+            app.saveQuote();
+        },
+
         updateQuoteTotal: () => {
              const items = app.currentTicket.quote.items;
              const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
@@ -892,7 +886,7 @@
 
         addQuoteItem: () => {
             if(!app.currentTicket.quote.items) app.currentTicket.quote.items = [];
-            app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0 });
+            app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false });
             app.renderQuoteItems(); // כאן חייבים רינדור מלא
         },
 
@@ -909,9 +903,8 @@
         updateStatus: async (newStatus) => {
             app.currentTicket.status = newStatus;
             await DB.update(app.currentTicket.id, { status: newStatus });
-            // Re-render only necessary parts or full view
             app.tickets = await DB.getAll(); // Refresh global list
-            app.renderTicketDetail(); // Refresh Detail View to update sidebar
+            app.renderTicketDetail(); 
             Utils.showToast('סטטוס עודכן');
         },
 
@@ -922,6 +915,11 @@
             const ctx = canvas.getContext('2d');
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
+            
+            // Set styles for visibility
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
             
             let isDrawing = false;
             
@@ -969,7 +967,132 @@
 
         // PDF Print
         printTicket: () => {
-            window.print();
+            const ticket = app.currentTicket;
+            const printWindow = window.open('', '_blank');
+            
+            // Calculate totals
+            const items = ticket.quote.items || [];
+            const subtotal = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+            const discount = ticket.quote.discount || 0;
+            const total = subtotal - discount;
+
+            const html = `
+                <html dir="rtl">
+                <head>
+                    <title>הצעת מחיר - תיקון #${ticket.ticketNumber}</title>
+                    <style>
+                        body { font-family: 'Heebo', sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }
+                        .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+                        .logo { font-size: 24px; font-weight: bold; color: #2563eb; }
+                        .meta { text-align: left; font-size: 14px; color: #666; }
+                        .title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+                        .grid-container { display: flex; gap: 40px; margin-bottom: 30px; }
+                        .col { flex: 1; }
+                        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }
+                        .row { margin-bottom: 5px; font-size: 14px; }
+                        .label { font-weight: 500; color: #555; }
+                        
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                        th { text-align: right; background: #f9fafb; padding: 10px; font-size: 14px; border-bottom: 1px solid #ddd; }
+                        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+                        
+                        .totals { margin-top: 0; margin-left: 0; margin-right: auto; width: 300px; }
+                        .total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+                        .grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; margin-top: 10px; padding-top: 10px; }
+                        
+                        .signature-section { margin-top: 60px; text-align: center; page-break-inside: avoid; }
+                        .sig-img { max-height: 100px; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
+                        
+                        .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+                        
+                        @media print {
+                            body { padding: 0; }
+                            button { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="logo">BikeCare Workshop CRM</div>
+                        <div class="meta">
+                            <div>תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
+                            <div>מספר תיקון: #${ticket.ticketNumber}</div>
+                        </div>
+                    </div>
+
+                    <div class="title">הצעת מחיר / כרטיס עבודה</div>
+
+                    <div class="grid-container">
+                        <div class="col">
+                            <div class="section-title">פרטי לקוח</div>
+                            <div class="row"><span class="label">שם:</span> ${ticket.customerName}</div>
+                            <div class="row"><span class="label">טלפון:</span> ${ticket.customerPhone}</div>
+                            <div class="row"><span class="label">אימייל:</span> ${ticket.customerEmail || '-'}</div>
+                        </div>
+                        <div class="col">
+                            <div class="section-title">פרטי אופניים</div>
+                            <div class="row"><span class="label">דגם:</span> ${ticket.bikeModel}</div>
+                            <div class="row"><span class="label">תקלה:</span> ${ticket.issueDescription}</div>
+                        </div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>תיאור</th>
+                                <th style="width: 60px">כמות</th>
+                                <th style="width: 100px">מחיר יח׳</th>
+                                <th style="width: 100px">סה״כ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${items.map(item => `
+                                <tr>
+                                    <td>${item.description}</td>
+                                    <td>${item.quantity}</td>
+                                    <td>${Utils.formatCurrency(item.price)}</td>
+                                    <td>${Utils.formatCurrency(item.quantity * item.price)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div class="totals">
+                        <div class="total-row">
+                            <span>סכום ביניים:</span>
+                            <span>${Utils.formatCurrency(subtotal)}</span>
+                        </div>
+                        <div class="total-row">
+                            <span>הנחה:</span>
+                            <span>${Utils.formatCurrency(discount)}</span>
+                        </div>
+                        <div class="total-row grand-total">
+                            <span>סה״כ לתשלום:</span>
+                            <span>${Utils.formatCurrency(total)}</span>
+                        </div>
+                    </div>
+
+                    ${ticket.quote.isSigned ? `
+                        <div class="signature-section">
+                            <img src="${ticket.quote.signature}" class="sig-img" alt="חתימה" />
+                            <div>חתימת לקוח</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">נחתם בתאריך: ${Utils.formatDate(ticket.quote.signedAt)}</div>
+                        </div>
+                    ` : '<div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>'}
+
+                    <div class="footer">
+                        הופק על ידי מערכת BikeCare Workshop CRM
+                    </div>
+
+                    <script>
+                        window.onload = function() { window.print(); }
+                    <\/script>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(html);
+            printWindow.document.close();
         },
 
         // Helpers
