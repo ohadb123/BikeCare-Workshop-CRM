@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BikeCare Workshop CRM</title>
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -51,7 +51,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v2.0 (Vanilla)
+            BikeCare v2.2 (Vanilla)
         </div>
     </aside>
 
@@ -73,8 +73,8 @@
             <div id="view-dashboard" class="view-section active">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold text-gray-800">דשבורד ניהולי</h2>
-                    <button onclick="app.addDemoData()" class="flex items-center gap-2 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition">
-                        <i data-lucide="database" class="w-4 h-4"></i> טען נתוני דוגמה
+                    <button onclick="router.navigate('create-ticket')" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                        <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
                     </button>
                 </div>
 
@@ -283,6 +283,11 @@
     </div>
 
 <script>
+    // --- הגדרות Supabase ---
+    const supabaseUrl = 'https://czxicysnfwvxapipzysg.supabase.co'; // הכתובת שלך מהתמונה
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6eGljeXNuZnd2eGFwaXB6eXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDY3MTYsImV4cCI6MjA4MDYyMjcxNn0.cgk7AxkRzkptv0lzj-63J2vBqj1dqB3OCk5qeq9BQqo'; // !!! קח את ה-anon key מהגדרות API ב-Supabase !!!
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
     // --- Utils ---
     const Utils = {
         formatCurrency: (num) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS' }).format(num),
@@ -290,7 +295,7 @@
             if(!dateStr) return '';
             return new Date(dateStr).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
         },
-        id: () => Math.random().toString(36).substr(2, 9),
+        id: () => crypto.randomUUID(), // שימוש במזהה ייחודי אמיתי
         showToast: (msg, type='success') => {
             const container = document.getElementById('toast-container');
             const el = document.createElement('div');
@@ -302,29 +307,48 @@
         }
     };
 
-    // --- Database (LocalStorage) ---
+    // --- Database (Supabase Cloud) ---
     const DB = {
-        KEY: 'bikecare_data_v1',
-        get: () => JSON.parse(localStorage.getItem(DB.KEY) || '[]'),
-        save: (data) => localStorage.setItem(DB.KEY, JSON.stringify(data)),
-        add: (ticket) => {
-            const data = DB.get();
+        // שליפת כל הנתונים מהענן
+        getAll: async () => {
+            const { data, error } = await supabase
+                .from('tickets')
+                .select('*')
+                .order('createdAt', { ascending: false });
+            
+            if (error) {
+                console.error("שגיאה בטעינת נתונים:", error);
+                Utils.showToast("שגיאה בטעינת נתונים", "error");
+                return [];
+            }
+            return data;
+        },
+        // הוספת תיקון חדש
+        add: async (ticket) => {
             const newTicket = { 
                 id: Utils.id(), 
                 createdAt: new Date().toISOString(), 
                 updatedAt: new Date().toISOString(),
                 ...ticket 
             };
-            data.unshift(newTicket);
-            DB.save(data);
+            
+            const { error } = await supabase.from('tickets').insert([newTicket]);
+            
+            if (error) {
+                console.error("שגיאה בשמירה:", error);
+                Utils.showToast("שגיאה בשמירה", "error");
+                throw error;
+            }
             return newTicket;
         },
-        update: (id, updates) => {
-            const data = DB.get();
-            const idx = data.findIndex(t => t.id === id);
-            if(idx > -1) {
-                data[idx] = { ...data[idx], ...updates, updatedAt: new Date().toISOString() };
-                DB.save(data);
+        // עדכון תיקון קיים
+        update: async (id, updates) => {
+            const updateData = { ...updates, updatedAt: new Date().toISOString() };
+            const { error } = await supabase.from('tickets').update(updateData).eq('id', id);
+            
+            if (error) {
+                console.error("שגיאה בעדכון:", error);
+                Utils.showToast("שגיאה בעדכון", "error");
             }
         }
     };
@@ -334,54 +358,81 @@
         tickets: [],
         currentTicket: null,
 
-        init: () => {
-            app.tickets = DB.get();
+        init: async () => {
+            // טעינה ראשונית - עכשיו זה אסינכרוני
+            app.tickets = await DB.getAll();
             app.setupListeners();
             router.navigate('dashboard');
             lucide.createIcons();
+            
+            // עדכון הנתונים ברקע כל 10 שניות (כדי לראות עדכונים של אחרים)
+            setInterval(async () => {
+                if(document.visibilityState === 'visible') {
+                    const freshData = await DB.getAll();
+                    // עדכון עדין רק אם יש שינוי במספר השורות או משהו קריטי
+                    if (freshData.length !== app.tickets.length) {
+                         app.tickets = freshData;
+                         // רענון המסך הנוכחי אם צריך
+                         const currentView = document.querySelector('.view-section.active').id;
+                         if(currentView === 'view-dashboard') app.renderDashboard();
+                         if(currentView === 'view-tickets') app.renderTickets();
+                    } else {
+                        app.tickets = freshData;
+                    }
+                }
+            }, 10000);
         },
 
         setupListeners: () => {
-            // Filter & Search
             document.getElementById('tickets-search').addEventListener('input', app.renderTickets);
             document.getElementById('tickets-filter').addEventListener('change', app.renderTickets);
-            document.getElementById('customers-search').addEventListener('input', app.renderCustomers);
+            const custSearch = document.getElementById('customers-search');
+            if(custSearch) custSearch.addEventListener('input', app.renderCustomers);
             
-            // Forms
-            document.getElementById('create-ticket-form').addEventListener('submit', (e) => {
+            document.getElementById('create-ticket-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
                 
-                DB.add({
-                    ...data,
-                    ticketNumber: Math.floor(1000 + Math.random() * 9000),
-                    status: 'new',
-                    quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
-                });
-                
-                app.tickets = DB.get();
-                e.target.reset();
-                Utils.showToast('כרטיס נפתח בהצלחה');
-                router.navigate('tickets');
+                try {
+                    await DB.add({
+                        ...data,
+                        ticketNumber: Math.floor(1000 + Math.random() * 9000),
+                        status: 'new',
+                        quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+                    });
+                    
+                    // רענון הנתונים
+                    app.tickets = await DB.getAll();
+                    e.target.reset();
+                    Utils.showToast('כרטיס נפתח בהצלחה');
+                    router.navigate('tickets');
+                } catch(err) {
+                    // השגיאה כבר מטופלת ב-DB
+                }
             });
         },
 
-        addDemoData: () => {
-            if(!confirm("לטעון נתוני דוגמה?")) return;
+        addDemoData: async () => {
+            if(!confirm("פעולה זו תוסיף נתונים לשרת האמיתי. להמשיך?")) return;
+            Utils.showToast('טוען נתונים...');
+            
             const demo = [
                 { customerName: "דני כהן", customerPhone: "050-1234567", customerEmail: "dani@test.com", bikeModel: "Trek Marlin 6", issueDescription: "פנצ'ר בגלגל אחורי", status: "new", priority: "normal" },
-                { customerName: "רונית לוי", customerPhone: "052-9876543", customerEmail: "ronit@test.com", bikeModel: "Specialized Sirrus", issueDescription: "טיפול 10,000", status: "in_progress", priority: "high" },
-                { customerName: "יוסי מזרחי", customerPhone: "054-5555555", customerEmail: "", bikeModel: "Cannondale Scalpel", issueDescription: "החלפת שרשרת", status: "completed", priority: "normal" }
+                { customerName: "רונית לוי", customerPhone: "052-9876543", customerEmail: "ronit@test.com", bikeModel: "Specialized Sirrus", issueDescription: "טיפול 10,000", status: "in_progress", priority: "high" }
             ];
-            demo.forEach(t => DB.add({
-                ...t,
-                ticketNumber: Math.floor(1000 + Math.random() * 9000),
-                quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
-            }));
-            app.tickets = DB.get();
-            app.renderDashboard(); // Refresh stats
-            Utils.showToast('נתונים נטענו');
+            
+            for (const t of demo) {
+                await DB.add({
+                    ...t,
+                    ticketNumber: Math.floor(1000 + Math.random() * 9000),
+                    quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+                });
+            }
+            
+            app.tickets = await DB.getAll();
+            app.renderDashboard();
+            Utils.showToast('נתונים נטענו בהצלחה');
         },
 
         renderDashboard: () => {
@@ -404,13 +455,16 @@
         },
 
         renderTickets: () => {
-            const search = document.getElementById('tickets-search').value.toLowerCase();
+            const searchInput = document.getElementById('tickets-search');
+            if (!searchInput) return;
+            
+            const search = searchInput.value.toLowerCase();
             const filter = document.getElementById('tickets-filter').value;
             
             const filtered = app.tickets.filter(t => {
-                const matchSearch = t.customerName.toLowerCase().includes(search) || 
-                                    t.ticketNumber.toString().includes(search) ||
-                                    t.bikeModel.toLowerCase().includes(search);
+                const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
+                                    (t.ticketNumber || '').toString().includes(search) ||
+                                    (t.bikeModel || '').toLowerCase().includes(search);
                 const matchFilter = filter === 'all' || t.status === filter;
                 return matchSearch && matchFilter;
             });
@@ -435,7 +489,8 @@
         },
 
         renderCustomers: () => {
-            const search = document.getElementById('customers-search') ? document.getElementById('customers-search').value.toLowerCase() : '';
+            const searchInput = document.getElementById('customers-search');
+            const search = searchInput ? searchInput.value.toLowerCase() : '';
             const custMap = new Map();
             
             app.tickets.forEach(t => {
@@ -455,19 +510,21 @@
             });
 
             const customers = Array.from(custMap.values()).filter(c => 
-                c.name.toLowerCase().includes(search) || c.phone.includes(search)
+                (c.name || '').toLowerCase().includes(search) || (c.phone || '').includes(search)
             );
 
             const tbody = document.getElementById('customers-table-body');
-            tbody.innerHTML = customers.map(c => `
-                <tr class="hover:bg-blue-50 border-b border-gray-100">
-                    <td class="p-4 font-medium">${c.name}</td>
-                    <td class="p-4">${c.phone}</td>
-                    <td class="p-4 hidden md:table-cell text-gray-500">${c.email || '-'}</td>
-                    <td class="p-4 text-center"><span class="bg-gray-100 px-2 py-1 rounded-full text-xs font-bold">${c.count}</span></td>
-                    <td class="p-4 text-left text-sm text-gray-500">${Utils.formatDate(c.last).split(',')[0]}</td>
-                </tr>
-            `).join('');
+            if(tbody) {
+                tbody.innerHTML = customers.map(c => `
+                    <tr class="hover:bg-blue-50 border-b border-gray-100">
+                        <td class="p-4 font-medium">${c.name}</td>
+                        <td class="p-4">${c.phone}</td>
+                        <td class="p-4 hidden md:table-cell text-gray-500">${c.email || '-'}</td>
+                        <td class="p-4 text-center"><span class="bg-gray-100 px-2 py-1 rounded-full text-xs font-bold">${c.count}</span></td>
+                        <td class="p-4 text-left text-sm text-gray-500">${Utils.formatDate(c.last).split(',')[0]}</td>
+                    </tr>
+                `).join('');
+            }
         },
 
         openTicket: (id) => {
@@ -475,11 +532,9 @@
             if(!ticket) return;
             app.currentTicket = ticket;
             
-            // Build the detailed view HTML dynamically
             const container = document.getElementById('view-ticket-detail');
             container.innerHTML = `
                 <div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg">
-                    <!-- Sidebar -->
                     <div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto">
                         <div class="flex justify-between items-start mb-6">
                             <div>
@@ -488,7 +543,6 @@
                             </div>
                             <button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
                         </div>
-
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
                             <div class="flex flex-wrap gap-2">
@@ -497,27 +551,19 @@
                                 `).join('')}
                             </div>
                         </div>
-
                         <div class="space-y-4">
                             <div class="bg-white p-4 rounded border">
                                 <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3>
                                 <div class="text-lg font-medium">${ticket.customerName}</div>
                                 <div class="text-gray-600 text-sm">${ticket.customerPhone}</div>
-                                <div class="text-gray-600 text-sm">${ticket.customerEmail || ''}</div>
                             </div>
                             <div class="bg-white p-4 rounded border">
                                 <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3>
                                 <div class="font-medium">${ticket.bikeModel}</div>
                                 <div class="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">${ticket.issueDescription}</div>
                             </div>
-                            
-                            <button onclick="app.generateAiMessage()" class="w-full flex items-center justify-center gap-2 p-2 text-sm bg-purple-50 text-purple-700 rounded border border-purple-200 hover:bg-purple-100">
-                                <i data-lucide="sparkles" class="w-4"></i> נסח הודעה ב-AI
-                            </button>
                         </div>
                     </div>
-
-                    <!-- Main Content (Quote) -->
                     <div class="w-full md:w-2/3 bg-white flex flex-col p-6 overflow-y-auto">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-bold">הצעת מחיר</h3>
@@ -526,7 +572,6 @@
                                 <button onclick="app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
                             </div>
                         </div>
-
                         <div class="bg-white border rounded-lg overflow-hidden mb-6">
                             <table class="w-full text-right text-sm" id="quote-table">
                                 <thead class="bg-gray-50 border-b">
@@ -542,31 +587,18 @@
                                 <span id="quote-total">0.00 ₪</span>
                             </div>
                         </div>
-
-                        <!-- Signature -->
-                        <div class="border rounded-lg p-4 bg-gray-50">
-                            <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
-                            <div id="signature-area">
-                                ${ticket.quote.isSigned 
-                                    ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
-                                    : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
-                                       <button onclick="app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
-                                }
-                            </div>
-                        </div>
                     </div>
                 </div>
             `;
             
             router.navigate('ticket-detail');
             lucide.createIcons();
-            app.renderQuoteItems(); // Render items
-            if(!ticket.quote.isSigned) app.initCanvas();
+            app.renderQuoteItems();
         },
 
         renderQuoteItems: () => {
             const tbody = document.getElementById('quote-items-body');
-            const items = app.currentTicket.quote.items;
+            const items = app.currentTicket.quote.items || [];
             
             tbody.innerHTML = items.map((item, idx) => `
                 <tr>
@@ -578,7 +610,6 @@
                 </tr>
             `).join('');
             
-            // Calc Total
             const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
             app.currentTicket.quote.total = total;
             document.getElementById('quote-total').innerText = Utils.formatCurrency(total);
@@ -588,10 +619,11 @@
         updateQuoteItem: (idx, field, val) => {
             const item = app.currentTicket.quote.items[idx];
             item[field] = field === 'description' ? val : parseFloat(val) || 0;
-            app.renderQuoteItems(); // Re-render to update totals
+            app.renderQuoteItems();
         },
 
         addQuoteItem: () => {
+            if(!app.currentTicket.quote.items) app.currentTicket.quote.items = [];
             app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0 });
             app.renderQuoteItems();
         },
@@ -601,98 +633,24 @@
             app.renderQuoteItems();
         },
 
-        saveQuote: () => {
-            DB.update(app.currentTicket.id, { quote: app.currentTicket.quote });
+        saveQuote: async () => {
+            await DB.update(app.currentTicket.id, { quote: app.currentTicket.quote });
             Utils.showToast('השינויים נשמרו');
         },
 
-        updateStatus: (newStatus) => {
+        updateStatus: async (newStatus) => {
             app.currentTicket.status = newStatus;
-            DB.update(app.currentTicket.id, { status: newStatus });
-            app.openTicket(app.currentTicket.id); // Refresh view to update UI
-            app.tickets = DB.get(); // Refresh global list
+            await DB.update(app.currentTicket.id, { status: newStatus });
+            app.openTicket(app.currentTicket.id);
+            // רענון הרשימה הראשית ברקע
+            app.tickets = await DB.getAll();
             Utils.showToast('סטטוס עודכן');
         },
 
-        // Canvas Logic
-        initCanvas: () => {
-            const canvas = document.getElementById('sig-canvas');
-            if(!canvas) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            let isDrawing = false;
-            
-            const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-                return {x, y};
-            }
-
-            const start = (e) => { isDrawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
-            const move = (e) => { 
-                if(!isDrawing) return; 
-                e.preventDefault(); 
-                const {x,y} = getPos(e); 
-                ctx.lineTo(x,y); 
-                ctx.stroke(); 
-            };
-            const end = () => { isDrawing = false; };
-
-            canvas.addEventListener('mousedown', start);
-            canvas.addEventListener('mousemove', move);
-            canvas.addEventListener('mouseup', end);
-            canvas.addEventListener('touchstart', start);
-            canvas.addEventListener('touchmove', move);
-            canvas.addEventListener('touchend', end);
-        },
-
-        saveSignature: () => {
-            const canvas = document.getElementById('sig-canvas');
-            const dataUrl = canvas.toDataURL();
-            app.currentTicket.quote.isSigned = true;
-            app.currentTicket.quote.signature = dataUrl;
-            app.currentTicket.quote.signedAt = new Date().toISOString();
-            app.saveQuote();
-            app.openTicket(app.currentTicket.id); // Refresh
-        },
-
-        clearSignature: () => {
-            app.currentTicket.quote.isSigned = false;
-            app.currentTicket.quote.signature = null;
-            app.saveQuote();
-            app.openTicket(app.currentTicket.id);
-        },
-
-        // AI Feature (Mock or Real)
-        generateAiMessage: async () => {
-            const t = app.currentTicket;
-            const prompt = `Write a friendly Hebrew WhatsApp message for customer ${t.customerName}. Bike: ${t.bikeModel}, Status: ${t.status}. Sign: BikeCare.`;
-            
-            // To make this work with real Gemini, you'd insert your API call logic here.
-            // For this Vanilla demo, we'll use a mock text or you can paste the API fetch code.
-            const mockText = `היי ${t.customerName}, כאן צוות BikeCare. רצינו לעדכן שהאופניים שלך (${t.bikeModel}) נמצאים כרגע בסטטוס: ${app.getStatusBadge(t.status, true)}. נעדכן בקרוב!`;
-            
-            document.getElementById('ai-result-text').value = mockText;
-            document.getElementById('ai-modal').classList.remove('hidden');
-        },
-
-        copyAiText: () => {
-            const txt = document.getElementById('ai-result-text');
-            txt.select();
-            document.execCommand('copy');
-            Utils.showToast('הועתק ללוח');
-            document.getElementById('ai-modal').classList.add('hidden');
-        },
-
-        // PDF Print
         printTicket: () => {
             window.print();
         },
 
-        // Helpers
         getStatusBadge: (status, textOnly = false) => {
             const s = STATUSES[status] || STATUSES.new;
             if(textOnly) return s.label;
@@ -714,13 +672,12 @@
         urgent: { label: 'דחוף' }
     };
 
-    // --- Router ---
     const router = {
         navigate: (target) => {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            document.getElementById(`view-${target}`).classList.add('active');
+            const view = document.getElementById(`view-${target}`);
+            if(view) view.classList.add('active');
             
-            // Highlight sidebar nav
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 if(btn.dataset.target === target) btn.classList.add('bg-blue-50', 'text-blue-700');
                 else btn.classList.remove('bg-blue-50', 'text-blue-700');
@@ -732,11 +689,9 @@
         }
     };
 
-    // Init
     window.onload = () => {
         app.init();
     };
-
 </script>
 </body>
 </html>
