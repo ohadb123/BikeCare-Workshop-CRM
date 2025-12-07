@@ -55,6 +55,32 @@
             color: #2563eb;
             border-bottom-color: #2563eb;
         }
+
+        /* Dashboard Cards Hover Effect */
+        .dash-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .dash-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Timeline styling */
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            right: -21px; /* Adjust for RTL */
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #cbd5e1;
+            border: 2px solid #fff;
+        }
+        .timeline-item.active::before {
+            background-color: #2563eb;
+        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
@@ -79,7 +105,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v3.7 (Fixed Print Bug)
+            BikeCare v4.2 (Hybrid DB Fix)
         </div>
     </aside>
 
@@ -106,22 +132,32 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-white p-6 rounded-lg shadow-sm border-r-4 border-blue-500">
-                        <div class="text-gray-500 text-sm">סה״כ הזמנות</div>
-                        <div class="text-3xl font-bold text-gray-800" id="stat-total">0</div>
+                <!-- Status Cards Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <!-- New -->
+                    <div onclick="app.filterTicketsByStatus('new')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-blue-500">
+                        <div class="text-gray-500 text-sm mb-1">חדש</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-new">0</div>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border-r-4 border-yellow-500">
-                        <div class="text-gray-500 text-sm">בטיפול / ממתין</div>
-                        <div class="text-3xl font-bold text-gray-800" id="stat-pending">0</div>
+                    <!-- In Progress -->
+                    <div onclick="app.filterTicketsByStatus('in_progress')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-yellow-500">
+                        <div class="text-gray-500 text-sm mb-1">בטיפול</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-in_progress">0</div>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border-r-4 border-green-500">
-                        <div class="text-gray-500 text-sm">הושלמו ומוכנים</div>
-                        <div class="text-3xl font-bold text-gray-800" id="stat-completed">0</div>
+                    <!-- Waiting Approval -->
+                    <div onclick="app.filterTicketsByStatus('waiting_approval')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-purple-500">
+                        <div class="text-gray-500 text-sm mb-1">ממתין לאישור</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-waiting_approval">0</div>
                     </div>
-                    <div class="bg-white p-6 rounded-lg shadow-sm border-r-4 border-red-500">
-                        <div class="text-gray-500 text-sm">דחוף / גבוה</div>
-                        <div class="text-3xl font-bold text-red-600" id="stat-urgent">0</div>
+                    <!-- Completed -->
+                    <div onclick="app.filterTicketsByStatus('completed')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-green-500">
+                        <div class="text-gray-500 text-sm mb-1">הושלם</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-completed">0</div>
+                    </div>
+                    <!-- Cancelled -->
+                    <div onclick="app.filterTicketsByStatus('cancelled')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-gray-500">
+                        <div class="text-gray-500 text-sm mb-1">בוטל</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-cancelled">0</div>
                     </div>
                 </div>
 
@@ -341,9 +377,9 @@
         }
     };
 
-    // --- Database (Supabase Cloud) ---
+    // --- Database (Supabase Cloud + Local Fallback for New Columns) ---
     const DB = {
-        // שליפת כל הנתונים מהענן
+        // שליפת כל הנתונים מהענן ומיזוג עם נתונים מקומיים
         getAll: async () => {
             const { data, error } = await supabase
                 .from('tickets')
@@ -355,15 +391,23 @@
                 Utils.showToast("שגיאה בטעינת נתונים", "error");
                 return [];
             }
-            return data;
+            
+            // Merge with local extras
+            return data.map(t => {
+                const extras = JSON.parse(localStorage.getItem(`ticket_extras_${t.id}`) || '{}');
+                return { ...t, ...extras };
+            });
         },
         // הוספת תיקון חדש
         add: async (ticket) => {
+            // Split fields: Core (Supabase) vs Extras (Local)
+            const { history, timeline, ...core } = ticket;
+            
             const newTicket = { 
                 id: Utils.id(), 
                 createdAt: new Date().toISOString(), 
                 updatedAt: new Date().toISOString(),
-                ...ticket 
+                ...core 
             };
             
             const { error } = await supabase.from('tickets').insert([newTicket]);
@@ -373,16 +417,35 @@
                 Utils.showToast("שגיאה בשמירה", "error");
                 throw error;
             }
+            
+            // Save extras locally
+            if(history || timeline) {
+                 localStorage.setItem(`ticket_extras_${newTicket.id}`, JSON.stringify({ history, timeline }));
+            }
+            
             return newTicket;
         },
         // עדכון תיקון קיים
         update: async (id, updates) => {
-            const updateData = { ...updates, updatedAt: new Date().toISOString() };
-            const { error } = await supabase.from('tickets').update(updateData).eq('id', id);
+            const { history, timeline, ...coreUpdates } = updates;
             
-            if (error) {
-                console.error("שגיאה בעדכון:", error);
-                Utils.showToast("שגיאה בעדכון", "error");
+            // Update Core in Supabase
+            if (Object.keys(coreUpdates).length > 0) {
+                const updateData = { ...coreUpdates, updatedAt: new Date().toISOString() };
+                const { error } = await supabase.from('tickets').update(updateData).eq('id', id);
+                if (error) {
+                    console.error("שגיאה בעדכון:", error);
+                    Utils.showToast("שגיאה בעדכון", "error");
+                }
+            }
+            
+            // Update Extras in LocalStorage
+            if (history || timeline) {
+                const currentExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
+                const newExtras = { ...currentExtras };
+                if(history) newExtras.history = history;
+                if(timeline) newExtras.timeline = timeline;
+                localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
             }
         }
     };
@@ -393,7 +456,8 @@
         currentTicket: null,
         currentCustomer: null,
         sortState: { field: 'createdAt', dir: 'desc' }, // State for sorting
-        activeTicketTab: 'details', // 'details' or 'history'
+        activeTicketTab: 'details', // 'details', 'history', 'timeline'
+        isEditingDetails: false,
 
         init: async () => {
             // טעינה ראשונית - עכשיו זה אסינכרוני
@@ -430,11 +494,14 @@
                 const data = Object.fromEntries(formData.entries());
                 
                 try {
+                    const nextId = app.getNextTicketNumber();
                     await DB.add({
                         ...data,
-                        ticketNumber: Math.floor(1000 + Math.random() * 9000),
+                        ticketNumber: nextId,
                         status: 'new',
-                        quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+                        quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false },
+                        timeline: [],
+                        history: [{date: new Date().toISOString(), action: 'נוצר', user: 'מערכת'}]
                     });
                     
                     // רענון הנתונים
@@ -446,6 +513,14 @@
                     // השגיאה כבר מטופלת ב-DB
                 }
             });
+        },
+
+        // Helper to calc next ID
+        getNextTicketNumber: () => {
+            const numbers = app.tickets.map(t => parseInt(t.ticketNumber) || 0);
+            const max = numbers.length > 0 ? Math.max(...numbers) : 0;
+            // Start from 2400 if max is low, else continue sequence
+            return Math.max(max + 1, 2400);
         },
 
         // Sorting Helper
@@ -479,28 +554,34 @@
             }
         },
 
-        deleteTicket: () => {
-            if(confirm("האם למחוק את התיקון לצמיתות?")) {
-                const deleteAsync = async () => {
-                    const { error } = await supabase.from('tickets').delete().eq('id', app.currentTicket.id);
-                    if(!error) {
-                        app.tickets = await DB.getAll();
-                        Utils.showToast("התיקון נמחק");
-                        router.navigate('tickets');
-                    } else {
-                        Utils.showToast("שגיאה במחיקה", "error");
-                    }
-                };
-                deleteAsync();
+        // Filter tickets from dashboard click
+        filterTicketsByStatus: (status) => {
+            router.navigate('tickets');
+            const dropdown = document.getElementById('tickets-filter');
+            if(dropdown) {
+                dropdown.value = status;
+                // Dispatch change event so the listener picks it up
+                dropdown.dispatchEvent(new Event('change'));
             }
         },
 
         renderDashboard: () => {
             const t = app.tickets;
-            document.getElementById('stat-total').innerText = t.length;
-            document.getElementById('stat-pending').innerText = t.filter(x => x.status !== 'completed' && x.status !== 'cancelled').length;
-            document.getElementById('stat-completed').innerText = t.filter(x => x.status === 'completed').length;
-            document.getElementById('stat-urgent').innerText = t.filter(x => (x.priority === 'high' || x.priority === 'urgent') && x.status !== 'completed').length;
+            // Count tickets by status
+            const counts = {
+                new: t.filter(x => x.status === 'new').length,
+                in_progress: t.filter(x => x.status === 'in_progress').length,
+                waiting_approval: t.filter(x => x.status === 'waiting_approval').length,
+                completed: t.filter(x => x.status === 'completed').length,
+                cancelled: t.filter(x => x.status === 'cancelled').length
+            };
+
+            // Update DOM elements
+            document.getElementById('stat-new').innerText = counts.new;
+            document.getElementById('stat-in_progress').innerText = counts.in_progress;
+            document.getElementById('stat-waiting_approval').innerText = counts.waiting_approval;
+            document.getElementById('stat-completed').innerText = counts.completed;
+            document.getElementById('stat-cancelled').innerText = counts.cancelled;
 
             const recentBody = document.getElementById('dashboard-table-body');
             recentBody.innerHTML = t.slice(0, 5).map(ticket => `
@@ -694,20 +775,91 @@
             const ticket = app.tickets.find(t => t.id === id);
             if(!ticket) return;
             app.currentTicket = ticket;
-            app.activeTicketTab = 'details'; // reset tab
-            router.navigate('ticket-detail'); // Navigate FIRST to ensure element is visible
-            app.renderTicketDetail(); // Then render contents into it
+            app.isEditingDetails = false; // Reset edit mode
+            app.activeTicketTab = 'details'; // Reset tab
+            app.renderTicketDetail(); // Render content
+            router.navigate('ticket-detail'); // Then switch view
         },
 
         switchTicketTab: (tabName) => {
             app.activeTicketTab = tabName;
             app.renderTicketDetail();
         },
+        
+        toggleEditDetails: () => {
+            app.isEditingDetails = !app.isEditingDetails;
+            app.renderTicketDetail();
+        },
+        
+        saveTicketDetails: async () => {
+             // Gather data from inputs
+             const container = document.getElementById('view-ticket-detail');
+             const name = container.querySelector('[data-field="customerName"]').value;
+             const phone = container.querySelector('[data-field="customerPhone"]').value;
+             const email = container.querySelector('[data-field="customerEmail"]').value;
+             const bike = container.querySelector('[data-field="bikeModel"]').value;
+             const issue = container.querySelector('[data-field="issueDescription"]').value;
+             
+             // Update logic
+             const updates = {
+                 customerName: name,
+                 customerPhone: phone,
+                 customerEmail: email,
+                 bikeModel: bike,
+                 issueDescription: issue
+             };
+             
+             // Add history
+             const newHistory = [...(app.currentTicket.history || []), {
+                 date: new Date().toISOString(),
+                 action: 'פרטים עודכנו',
+                 user: 'צוות'
+             }];
+             
+             await DB.update(app.currentTicket.id, { ...updates, history: newHistory });
+             app.currentTicket = { ...app.currentTicket, ...updates, history: newHistory };
+             app.isEditingDetails = false;
+             app.renderTicketDetail();
+             Utils.showToast("הפרטים עודכנו בהצלחה");
+        },
+        
+        addTimelineEntry: async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const action = form.action.value;
+            const notes = form.notes.value;
+            
+            const newEntry = {
+                id: crypto.randomUUID(),
+                date: new Date().toISOString(),
+                action,
+                notes,
+                user: 'טכנאי'
+            };
+            
+            const currentTimeline = app.currentTicket.timeline || [];
+            const updatedTimeline = [newEntry, ...currentTimeline];
+            
+            await DB.update(app.currentTicket.id, { timeline: updatedTimeline });
+            app.currentTicket.timeline = updatedTimeline;
+            form.reset();
+            app.renderTicketDetail(); // Re-render to show new entry
+        },
 
         renderTicketDetail: () => {
             const ticket = app.currentTicket;
             const customerHistory = app.tickets.filter(t => t.customerPhone === ticket.customerPhone && t.id !== ticket.id);
             const container = document.getElementById('view-ticket-detail');
+            const timeline = ticket.timeline || [];
+            
+            // Generate Insights based on timeline/issue
+            const issueKeywords = (ticket.issueDescription + " " + timeline.map(t=>t.notes).join(" ")).toLowerCase();
+            const tags = [];
+            if(issueKeywords.includes('פנצ')) tags.push('תיקון פנצ׳ר');
+            if(issueKeywords.includes('ברקס') || issueKeywords.includes('בלם')) tags.push('מערכת בלמים');
+            if(issueKeywords.includes('הילוכים')) tags.push('כיוון הילוכים');
+            if(issueKeywords.includes('שרשרת')) tags.push('הנע');
+            if(tags.length === 0) tags.push('בדיקה כללית');
             
             const detailsContent = `
                 <div class="flex justify-between items-center mb-4">
@@ -739,17 +891,52 @@
                         <span id="quote-total">0.00 ₪</span>
                     </div>
                 </div>
-                <!-- Signature -->
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
-                    <div id="signature-area">
-                        ${ticket.quote.isSigned 
-                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
-                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
-                               <button onclick="app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
-                        }
+            `;
+            
+            const timelineContent = `
+                 <div class="bg-white p-4 rounded-lg border mb-4">
+                    <h4 class="font-bold mb-3">הוסף תיעוד חדש</h4>
+                    <form onsubmit="app.addTimelineEntry(event)" class="space-y-3">
+                        <div class="flex gap-2">
+                             <select name="action" class="border rounded p-2 text-sm w-1/3">
+                                 <option>בדיקה ראשונית</option>
+                                 <option>המתנה לחלקים</option>
+                                 <option>ביצוע תיקון</option>
+                                 <option>בדיקת איכות</option>
+                                 <option>סיום טיפול</option>
+                                 <option>יצירת קשר עם לקוח</option>
+                             </select>
+                             <input name="notes" placeholder="פרט מה בוצע, תוצאות או הערות..." class="border rounded p-2 text-sm flex-1" required>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-1 rounded text-sm hover:bg-blue-700">הוסף ליומן</button>
+                        </div>
+                    </form>
+                 </div>
+                 
+                 <div class="relative border-r-2 border-gray-200 mr-3 space-y-6">
+                    ${timeline.map((item, idx) => `
+                        <div class="timeline-item ${idx === 0 ? 'active' : ''} mr-6 relative">
+                            <div class="text-xs text-gray-500 mb-1 flex justify-between">
+                                <span>${Utils.formatDate(item.date)}</span>
+                                <span class="font-bold">${item.user || 'מערכת'}</span>
+                            </div>
+                            <div class="bg-white p-3 rounded border shadow-sm">
+                                <div class="font-bold text-blue-700 text-sm mb-1">${item.action}</div>
+                                <div class="text-sm text-gray-700">${item.notes}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${timeline.length === 0 ? '<div class="mr-6 text-gray-400 text-sm">אין רישומים ביומן עדיין.</div>' : ''}
+                 </div>
+                 
+                 <!-- Analysis Widget -->
+                 <div class="mt-8 bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+                    <h4 class="font-bold text-indigo-800 mb-2 flex items-center gap-2"><i data-lucide="brain-circuit" class="w-4"></i> תובנות מערכת (אוטומטי)</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${tags.map(t => `<span class="bg-white text-indigo-600 px-2 py-1 rounded text-xs border border-indigo-200 shadow-sm">${t}</span>`).join('')}
                     </div>
-                </div>
+                 </div>
             `;
 
             const historyContent = `
@@ -775,17 +962,31 @@
                     `).join('')}
                 </div>
             `;
+            
+            // Editable Inputs Logic
+            const renderInput = (field, value, type="text") => {
+                if(app.isEditingDetails) {
+                    return `<input data-field="${field}" value="${value}" class="w-full border rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-200">`;
+                }
+                return `<div class="text-gray-800 font-medium">${value || '-'}</div>`;
+            };
 
             container.innerHTML = `
                 <div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg">
-                    <div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto">
+                    <div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto flex flex-col">
                         <div class="flex justify-between items-start mb-6">
                             <div>
                                 <h2 class="text-2xl font-bold text-gray-800">תיקון #${ticket.ticketNumber}</h2>
                                 <div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div>
                             </div>
-                            <button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
+                            <div class="flex gap-2">
+                                <button onclick="app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}">
+                                    <i data-lucide="${app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i>
+                                </button>
+                                <button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
+                            </div>
                         </div>
+                        
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
                             <div class="flex flex-wrap gap-2">
@@ -794,32 +995,50 @@
                                 `).join('')}
                             </div>
                         </div>
-                        <div class="space-y-4">
-                            <div class="bg-white p-4 rounded border">
-                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3>
-                                <div class="text-lg font-medium cursor-pointer text-blue-600 hover:underline" onclick="app.openCustomer('${ticket.customerPhone}')">${ticket.customerName}</div>
-                                <div class="text-gray-600 text-sm">${ticket.customerPhone}</div>
-                                <div class="text-gray-600 text-sm">${ticket.customerEmail || ''}</div>
-                            </div>
-                            <div class="bg-white p-4 rounded border">
-                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-2"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3>
-                                <div class="font-medium">${ticket.bikeModel}</div>
-                                <div class="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">${ticket.issueDescription}</div>
+                        
+                        <div class="space-y-4 flex-1">
+                            <div class="bg-white p-4 rounded border relative group">
+                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3>
+                                <div class="space-y-2 text-sm">
+                                    <div><span class="text-gray-400 text-xs">שם:</span> ${renderInput('customerName', ticket.customerName)}</div>
+                                    <div><span class="text-gray-400 text-xs">טלפון:</span> ${renderInput('customerPhone', ticket.customerPhone)}</div>
+                                    <div><span class="text-gray-400 text-xs">אימייל:</span> ${renderInput('customerEmail', ticket.customerEmail)}</div>
+                                </div>
                             </div>
                             
-                            <button onclick="app.deleteTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm bg-red-50 text-red-700 rounded border border-red-200 hover:bg-red-100 mt-2">
-                                <i data-lucide="trash-2" class="w-4"></i> מחק תיקון
-                            </button>
+                            <div class="bg-white p-4 rounded border">
+                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3>
+                                <div class="space-y-2 text-sm">
+                                    <div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div>
+                                    <div>
+                                        <span class="text-gray-400 text-xs">תקלה:</span>
+                                        ${app.isEditingDetails 
+                                            ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>`
+                                            : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${app.isEditingDetails ? `
+                                <button onclick="app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+                                    <i data-lucide="save" class="w-4"></i> שמור שינויים
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
+                    
                     <div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden">
                         <!-- Tabs -->
                         <div class="flex border-b bg-gray-50">
-                            <button onclick="app.switchTicketTab('details')" class="tab-btn flex-1 ${app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button>
-                            <button onclick="app.switchTicketTab('history')" class="tab-btn flex-1 ${app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח (${customerHistory.length})</button>
+                            <button onclick="app.switchTicketTab('details')" class="tab-btn flex-1 ${app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר</button>
+                            <button onclick="app.switchTicketTab('timeline')" class="tab-btn flex-1 ${app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button>
+                            <button onclick="app.switchTicketTab('history')" class="tab-btn flex-1 ${app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button>
                         </div>
                         <div class="p-6 overflow-y-auto h-full">
-                            ${app.activeTicketTab === 'details' ? detailsContent : historyContent}
+                            ${app.activeTicketTab === 'details' ? detailsContent : 
+                              app.activeTicketTab === 'timeline' ? timelineContent : 
+                              historyContent}
                         </div>
                     </div>
                 </div>
@@ -828,7 +1047,6 @@
             lucide.createIcons();
             if(app.activeTicketTab === 'details') {
                 app.renderQuoteItems();
-                if(!ticket.quote.isSigned) app.initCanvas();
             }
         },
 
@@ -906,63 +1124,6 @@
             app.tickets = await DB.getAll(); // Refresh global list
             app.renderTicketDetail(); 
             Utils.showToast('סטטוס עודכן');
-        },
-
-        // Canvas Logic
-        initCanvas: () => {
-            const canvas = document.getElementById('sig-canvas');
-            if(!canvas) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            // Set styles for visibility
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#000';
-            
-            let isDrawing = false;
-            
-            const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-                return {x, y};
-            }
-
-            const start = (e) => { isDrawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
-            const move = (e) => { 
-                if(!isDrawing) return; 
-                e.preventDefault(); 
-                const {x,y} = getPos(e); 
-                ctx.lineTo(x,y); 
-                ctx.stroke(); 
-            };
-            const end = () => { isDrawing = false; };
-
-            canvas.addEventListener('mousedown', start);
-            canvas.addEventListener('mousemove', move);
-            canvas.addEventListener('mouseup', end);
-            canvas.addEventListener('touchstart', start);
-            canvas.addEventListener('touchmove', move);
-            canvas.addEventListener('touchend', end);
-        },
-
-        saveSignature: () => {
-            const canvas = document.getElementById('sig-canvas');
-            const dataUrl = canvas.toDataURL();
-            app.currentTicket.quote.isSigned = true;
-            app.currentTicket.quote.signature = dataUrl;
-            app.currentTicket.quote.signedAt = new Date().toISOString();
-            app.saveQuote();
-            app.renderTicketDetail();
-        },
-
-        clearSignature: () => {
-            app.currentTicket.quote.isSigned = false;
-            app.currentTicket.quote.signature = null;
-            app.saveQuote();
-            app.renderTicketDetail();
         },
 
         // PDF Print
