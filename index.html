@@ -102,10 +102,13 @@
             <button onclick="router.navigate('customers')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="customers">
                 <i data-lucide="users" class="w-5 h-5"></i> לקוחות
             </button>
+            <button onclick="router.navigate('secondhand')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="secondhand">
+                <i data-lucide="bike" class="w-5 h-5"></i> יד שנייה
+            </button>
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v5.5 (Search by Tag)
+            BikeCare v6.1 (Updated Dashboard)
         </div>
     </aside>
 
@@ -169,15 +172,20 @@
                     <i data-lucide="shopping-bag" class="w-5 h-5"></i> מכירה והדגמה
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-                    <!-- New Bike (Custom Status) -->
+                    <!-- New Bike -->
                     <div onclick="app.filterTicketsByStatus('new_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-teal-500 h-full flex flex-col justify-between">
                         <div class="text-gray-500 text-sm mb-1">אופניים חדשים</div>
                         <div class="text-2xl font-bold text-gray-800" id="stat-new_bike">0</div>
                     </div>
-                    <!-- Test Bike (Custom Status) -->
+                    <!-- Test Bike -->
                     <div onclick="app.filterTicketsByStatus('test_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-orange-500 h-full flex flex-col justify-between">
                         <div class="text-gray-500 text-sm mb-1">אופני מבחן</div>
                         <div class="text-2xl font-bold text-gray-800" id="stat-test_bike">0</div>
+                    </div>
+                    <!-- Second Hand (New Card) -->
+                    <div onclick="router.navigate('secondhand')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-indigo-500 h-full flex flex-col justify-between">
+                        <div class="text-gray-500 text-sm mb-1">יד שנייה</div>
+                        <div class="text-2xl font-bold text-gray-800" id="stat-second_hand">0</div>
                     </div>
                 </div>
 
@@ -379,6 +387,144 @@
                 <!-- Content injected by JS -->
             </div>
 
+            <!-- Second Hand Bikes View (New) -->
+            <div id="view-secondhand" class="view-section">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">ניהול מלאי אופני יד שנייה</h2>
+                    <button onclick="app.openCreateBike()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm font-medium">
+                        <i data-lucide="plus" class="w-4 h-4"></i> אופניים חדשים למלאי
+                    </button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-center">
+                     <div class="relative flex-1 w-full">
+                        <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                        <input type="text" id="bike-search" placeholder="חיפוש לפי מותג, דגם או מק״ט..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="app.renderBikes()">
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <select id="bike-filter-brand" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="app.renderBikes()">
+                            <option value="all">כל המותגים</option>
+                        </select>
+                        <select id="bike-filter-size" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="app.renderBikes()">
+                            <option value="all">כל המידות</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right">
+                            <thead class="bg-gray-50 text-gray-600 border-b">
+                                <tr>
+                                    <th class="p-4">מותג</th>
+                                    <th class="p-4">דגם</th>
+                                    <th class="p-4 hidden md:table-cell">שנה / צבע</th>
+                                    <th class="p-4">מידה</th>
+                                    <th class="p-4">מחיר</th>
+                                    <th class="p-4 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bikes-table-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bike Detail/Edit View (New) -->
+            <div id="view-bike-detail" class="view-section">
+                 <div class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+                    <div class="flex justify-between items-center mb-6 border-b pb-4">
+                        <h2 class="text-xl font-bold" id="bike-form-title">כרטיס אופני יד שנייה</h2>
+                        <button onclick="router.navigate('secondhand')" class="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="bike-form" class="space-y-4">
+                        <input type="hidden" name="id">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">מותג *</label>
+                                <input name="brand" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">דגם *</label>
+                                <input name="model" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">מחיר סופי *</label>
+                                <input name="price" type="number" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-bold text-green-700">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">גודל גלגל</label>
+                                <input name="wheelSize" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">מידה</label>
+                                <input name="size" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">צבע</label>
+                                <input name="color" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">תרכובת שלדה</label>
+                                <select name="frameMaterial" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="">- בחר -</option>
+                                    <option value="אלומיניום">אלומיניום</option>
+                                    <option value="קרבון">קרבון</option>
+                                    <option value="פלדה">פלדה</option>
+                                    <option value="טיטניום">טיטניום</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">מק״ט בקופה</label>
+                                <input name="sku" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4 mt-4">
+                            <h4 class="text-sm font-bold text-gray-500 mb-3">מפרט טכני נוסף (אופציונלי)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">גודל סוללה</label>
+                                    <input name="battery" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מנוע</label>
+                                    <input name="motor" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מהלך בולם קדמי (מ״מ)</label>
+                                    <input name="frontTravel" type="number" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מהלך מתלה אחורי (מ״מ)</label>
+                                    <input name="rearTravel" type="number" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-6 flex justify-between items-center">
+                            <button type="button" id="btn-delete-bike" onclick="app.deleteBike()" class="text-red-600 hover:bg-red-50 px-4 py-2 rounded hidden">
+                                <i data-lucide="trash-2" class="w-4 h-4 inline"></i> מחק פריט
+                            </button>
+                            <div class="flex gap-3">
+                                <button type="button" onclick="router.navigate('secondhand')" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">ביטול</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">שמור אופניים</button>
+                            </div>
+                        </div>
+                    </form>
+                 </div>
+            </div>
+
         </div> <!-- End Content Area -->
     </main>
 
@@ -484,11 +630,40 @@
         }
     };
 
+    // --- Second Hand Bike Database (Local Storage only for this module) ---
+    const BikeDB = {
+        KEY: 'bikecare_bikes_inventory',
+        getAll: () => JSON.parse(localStorage.getItem(BikeDB.KEY) || '[]'),
+        save: (data) => localStorage.setItem(BikeDB.KEY, JSON.stringify(data)),
+        add: (bike) => {
+            const list = BikeDB.getAll();
+            const newBike = { id: Utils.id(), createdAt: new Date().toISOString(), ...bike };
+            list.unshift(newBike);
+            BikeDB.save(list);
+            return newBike;
+        },
+        update: (id, updates) => {
+            const list = BikeDB.getAll();
+            const idx = list.findIndex(b => b.id === id);
+            if(idx > -1) {
+                list[idx] = { ...list[idx], ...updates };
+                BikeDB.save(list);
+            }
+        },
+        delete: (id) => {
+            let list = BikeDB.getAll();
+            list = list.filter(b => b.id !== id);
+            BikeDB.save(list);
+        }
+    };
+
     // --- App Logic ---
     const app = {
         tickets: [],
+        bikes: [],
         currentTicket: null,
         currentCustomer: null,
+        currentBike: null,
         sortState: { field: 'createdAt', dir: 'desc' }, // State for sorting
         activeTicketTab: 'details', // 'details', 'history', 'timeline'
         isEditingDetails: false,
@@ -496,6 +671,8 @@
         init: async () => {
             // טעינה ראשונית - עכשיו זה אסינכרוני
             app.tickets = await DB.getAll();
+            app.bikes = BikeDB.getAll();
+            
             app.setupListeners();
             router.navigate('dashboard');
             lucide.createIcons();
@@ -550,7 +727,115 @@
                     // השגיאה כבר מטופלת ב-DB
                 }
             });
+
+            // Bike Form Listener
+            document.getElementById('bike-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                const id = data.id; 
+                delete data.id; // clean up
+
+                if (id) {
+                    BikeDB.update(id, data);
+                    Utils.showToast('אופניים עודכנו');
+                } else {
+                    BikeDB.add(data);
+                    Utils.showToast('אופניים נוספו למלאי');
+                }
+                app.bikes = BikeDB.getAll();
+                app.renderBikes();
+                router.navigate('secondhand');
+            });
         },
+
+        // --- Bikes Module Functions ---
+        openCreateBike: () => {
+            const form = document.getElementById('bike-form');
+            form.reset();
+            form.querySelector('[name="id"]').value = ''; // Ensure ID is empty for new
+            document.getElementById('bike-form-title').innerText = 'כרטיס אופני יד שנייה - חדש';
+            document.getElementById('btn-delete-bike').classList.add('hidden');
+            router.navigate('bike-detail');
+        },
+
+        openBikeDetail: (id) => {
+            const bike = app.bikes.find(b => b.id === id);
+            if (!bike) return;
+            
+            const form = document.getElementById('bike-form');
+            form.reset();
+            
+            // Populate form
+            Object.keys(bike).forEach(key => {
+                const field = form.querySelector(`[name="${key}"]`);
+                if(field) field.value = bike[key];
+            });
+            form.querySelector('[name="id"]').value = bike.id;
+
+            document.getElementById('bike-form-title').innerText = `עריכת אופניים: ${bike.brand} ${bike.model}`;
+            document.getElementById('btn-delete-bike').classList.remove('hidden');
+            router.navigate('bike-detail');
+        },
+
+        deleteBike: () => {
+            const id = document.getElementById('bike-form').querySelector('[name="id"]').value;
+            if (id && confirm('האם למחוק אופניים אלו מהמלאי?')) {
+                BikeDB.delete(id);
+                app.bikes = BikeDB.getAll();
+                app.renderBikes();
+                Utils.showToast('הפריט נמחק');
+                router.navigate('secondhand');
+            }
+        },
+
+        renderBikes: () => {
+            const search = document.getElementById('bike-search').value.toLowerCase();
+            const brandFilter = document.getElementById('bike-filter-brand').value;
+            const sizeFilter = document.getElementById('bike-filter-size').value;
+
+            // Populate filters dynamically if needed (simplified here)
+            const brands = [...new Set(app.bikes.map(b => b.brand))];
+            const sizes = [...new Set(app.bikes.map(b => b.size))];
+            
+            // Note: In a real app, don't re-render options on every keystroke to avoid focus loss
+            // For now we assume filters are populated once or we accept simple re-render
+            
+            const filtered = app.bikes.filter(b => {
+                const matchSearch = (b.brand + b.model + b.sku).toLowerCase().includes(search);
+                const matchBrand = brandFilter === 'all' || b.brand === brandFilter;
+                const matchSize = sizeFilter === 'all' || b.size === sizeFilter;
+                return matchSearch && matchBrand && matchSize;
+            });
+
+            // Update Dropdowns only if empty (init)
+            const brandSelect = document.getElementById('bike-filter-brand');
+            if (brandSelect.children.length === 1) {
+                brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
+            }
+            const sizeSelect = document.getElementById('bike-filter-size');
+             if (sizeSelect.children.length === 1) {
+                sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            }
+
+            const tbody = document.getElementById('bikes-table-body');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">לא נמצאו אופניים</td></tr>`;
+            } else {
+                tbody.innerHTML = filtered.map(b => `
+                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="app.openBikeDetail('${b.id}')">
+                        <td class="p-4 font-medium">${b.brand}</td>
+                        <td class="p-4">${b.model}</td>
+                        <td class="p-4 hidden md:table-cell text-gray-500">${b.color || '-'}</td>
+                        <td class="p-4">${b.size || '-'}</td>
+                        <td class="p-4 font-bold text-green-600">${Utils.formatCurrency(b.price)}</td>
+                        <td class="p-4"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-400"></i></td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            }
+        },
+
 
         // Get unique customers for autocomplete
         getCustomers: () => {
@@ -656,7 +941,8 @@
                 in_progress: t.filter(x => x.status === 'in_progress').length,
                 waiting_approval: t.filter(x => x.status === 'waiting_approval').length,
                 completed: t.filter(x => x.status === 'completed').length,
-                cancelled: t.filter(x => x.status === 'cancelled').length
+                cancelled: t.filter(x => x.status === 'cancelled').length,
+                second_hand: app.bikes.length // Add this
             };
 
             // Update DOM elements
@@ -667,6 +953,7 @@
             document.getElementById('stat-waiting_approval').innerText = counts.waiting_approval;
             document.getElementById('stat-completed').innerText = counts.completed;
             document.getElementById('stat-cancelled').innerText = counts.cancelled;
+            document.getElementById('stat-second_hand').innerText = counts.second_hand; // New
 
             const recentBody = document.getElementById('dashboard-table-body');
             recentBody.innerHTML = t.slice(0, 5).map(ticket => `
@@ -1372,6 +1659,7 @@
             if(target === 'dashboard') app.renderDashboard();
             if(target === 'tickets') app.renderTickets();
             if(target === 'customers') app.renderCustomers();
+            if(target === 'secondhand') app.renderBikes();
         }
     };
 
