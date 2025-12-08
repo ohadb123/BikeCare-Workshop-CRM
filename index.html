@@ -105,7 +105,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v5.4 (Split Dashboard)
+            BikeCare v5.5 (Search by Tag)
         </div>
     </aside>
 
@@ -217,7 +217,7 @@
                 <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4 flex-wrap">
                     <div class="relative flex-1 min-w-[200px]">
                         <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
-                        <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם או מספר..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם, מספר או תג..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div class="flex items-center gap-2">
                         <i data-lucide="filter" class="text-gray-500 w-4 h-4"></i>
@@ -691,7 +691,8 @@
             let filtered = app.tickets.filter(t => {
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
                                     (t.ticketNumber || '').toString().includes(search) ||
-                                    (t.bikeModel || '').toLowerCase().includes(search);
+                                    (t.bikeModel || '').toLowerCase().includes(search) ||
+                                    (t.tagNumber || '').toString().includes(search);
                 const matchFilter = filter === 'all' || t.status === filter;
                 const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
                 return matchSearch && matchFilter && matchPriority;
