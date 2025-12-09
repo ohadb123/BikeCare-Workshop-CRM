@@ -131,7 +131,7 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
         <!-- Mobile Header -->
-        <header class="md:hidden bg-white p-4 shadow-sm flex justify-between items-center z-10">
+        <header class="md:hidden bg-white p-4 shadow-sm flex flex-row-reverse justify-between items-center z-10">
             <div class="flex items-center gap-2 text-blue-600 font-bold text-lg">
                 <i data-lucide="wrench" class="w-6 h-6"></i> BikeCare
             </div>
@@ -1717,6 +1717,14 @@
         urgent: { label: 'דחוף' }
     };
 
+    const closeMobileMenu = () => {
+        const aside = document.querySelector('aside');
+        if (aside.classList.contains('absolute')) {
+            aside.classList.add('hidden');
+            aside.classList.remove('absolute', 'z-50', 'h-full');
+        }
+    };
+
     // --- Router ---
     const router = {
         navigate: (target) => {
@@ -1733,6 +1741,8 @@
             if(target === 'tickets') app.renderTickets();
             if(target === 'customers') app.renderCustomers();
             if(target === 'secondhand') app.renderBikes();
+
+            closeMobileMenu();
         }
     };
 
