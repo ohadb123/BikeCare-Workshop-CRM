@@ -124,7 +124,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v6.4 (Clean Header)
+            BikeCare v6.5 (Text Wrap Fix)
         </div>
     </aside>
 
@@ -217,14 +217,11 @@
                         <table class="w-full text-right text-sm border-collapse">
                             <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
                                 <tr>
-                                    <th class="p-3 border-b font-medium">לקוח</th>
-                                    <th class="p-3 border-b font-medium">דגם/תיאור</th>
-                                    <th class="p-3 border-b font-medium">סטטוס</th>
-                                    <!-- Updated header text -->
-                                    <th class="p-3 border-b font-medium">
-                                        ימים מאז שינוי סטטוס
-                                    </th>
-                                    <th class="p-3 border-b font-medium">הנחיה</th>
+                                    <th class="p-3 border-b font-medium w-1/6">לקוח</th>
+                                    <th class="p-3 border-b font-medium w-1/6">דגם/תיאור</th>
+                                    <th class="p-3 border-b font-medium w-1/6">סטטוס</th>
+                                    <th class="p-3 border-b font-medium w-1/6">ימים מאז שינוי סטטוס</th>
+                                    <th class="p-3 border-b font-medium w-2/6">הנחיה</th>
                                 </tr>
                             </thead>
                             <tbody id="attention-table-body" class="divide-y divide-gray-100">
@@ -1035,7 +1032,7 @@
                                 ${ticket.diffDays}
                             </span>
                         </td>
-                        <td class="p-3 text-sm text-gray-500 max-w-xs truncate" title="${actionText}">${actionText}</td>
+                        <td class="p-3 text-sm text-gray-500 whitespace-normal leading-snug min-w-[200px]">${actionText}</td>
                     </tr>
                     `;
                 }).join('');
