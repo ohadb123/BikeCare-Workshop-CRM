@@ -81,6 +81,22 @@
         .timeline-item.active::before {
             background-color: #2563eb;
         }
+
+        /* Scrollbar styling for table container */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
@@ -108,7 +124,7 @@
         </nav>
 
         <div class="p-4 border-t text-sm text-gray-400 text-center">
-            BikeCare v6.1 (Updated Dashboard)
+            BikeCare v6.4 (Clean Header)
         </div>
     </aside>
 
@@ -172,43 +188,56 @@
                     <i data-lucide="shopping-bag" class="w-5 h-5"></i> מכירה והדגמה
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
-                    <!-- New Bike -->
+                    <!-- New Bike (Custom Status) -->
                     <div onclick="app.filterTicketsByStatus('new_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-teal-500 h-full flex flex-col justify-between">
                         <div class="text-gray-500 text-sm mb-1">אופניים חדשים</div>
                         <div class="text-2xl font-bold text-gray-800" id="stat-new_bike">0</div>
                     </div>
-                    <!-- Test Bike -->
+                    <!-- Test Bike (Custom Status) -->
                     <div onclick="app.filterTicketsByStatus('test_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-orange-500 h-full flex flex-col justify-between">
                         <div class="text-gray-500 text-sm mb-1">אופני מבחן</div>
                         <div class="text-2xl font-bold text-gray-800" id="stat-test_bike">0</div>
                     </div>
-                    <!-- Second Hand (New Card) -->
+                     <!-- Second Hand -->
                     <div onclick="router.navigate('secondhand')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-indigo-500 h-full flex flex-col justify-between">
                         <div class="text-gray-500 text-sm mb-1">יד שנייה</div>
                         <div class="text-2xl font-bold text-gray-800" id="stat-second_hand">0</div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-lg shadow-sm p-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">תיקונים אחרונים</h3>
-                        <button onclick="router.navigate('tickets')" class="text-blue-600 hover:underline text-sm">לכל התיקונים</button>
+                <!-- NEW: Actionable Table -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden" style="height: 500px;">
+                    <div class="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i data-lucide="alert-circle" class="text-red-500 w-5 h-5"></i> מה דורש טיפול עכשיו
+                        </h3>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-right">
-                            <thead class="bg-gray-50 text-gray-600">
+                    
+                    <div class="overflow-auto custom-scroll flex-1 p-0">
+                        <table class="w-full text-right text-sm border-collapse">
+                            <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
                                 <tr>
-                                    <th class="p-3">#</th>
-                                    <th class="p-3">לקוח</th>
-                                    <th class="p-3">דגם</th>
-                                    <th class="p-3">סטטוס</th>
-                                    <th class="p-3">תאריך</th>
+                                    <th class="p-3 border-b font-medium">לקוח</th>
+                                    <th class="p-3 border-b font-medium">דגם/תיאור</th>
+                                    <th class="p-3 border-b font-medium">סטטוס</th>
+                                    <!-- Updated header text -->
+                                    <th class="p-3 border-b font-medium">
+                                        ימים מאז שינוי סטטוס
+                                    </th>
+                                    <th class="p-3 border-b font-medium">הנחיה</th>
                                 </tr>
                             </thead>
-                            <tbody id="dashboard-table-body" class="divide-y divide-gray-100">
+                            <tbody id="attention-table-body" class="divide-y divide-gray-100">
                                 <!-- Populated by JS -->
+                                <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <div class="p-3 border-t bg-gray-50 text-center shrink-0">
+                        <button onclick="router.navigate('tickets')" class="text-blue-600 hover:underline text-sm font-medium">
+                            הצג הכל
+                        </button>
                     </div>
                 </div>
             </div>
@@ -554,6 +583,17 @@
             container.appendChild(el);
             setTimeout(() => el.remove(), 3000);
         }
+    };
+
+    // --- Actions/Statuses Map for Operational Dashboard ---
+    const ACTION_TEXTS = {
+        new: 'מומלץ ליצור קשר ראשוני לאיסוף פרטים ולהבנת הצורך.',
+        waiting_approval: 'יש לוודא שהלקוח קיבל את ההצעה וכי הכל ברור מבחינתו.',
+        in_progress: 'מומלץ לעדכן את הלקוח לגבי סטטוס הטיפול והשלבים הבאים.',
+        completed: 'מומלץ לתאם מועד מסירה או איסוף עם הלקוח.',
+        cancelled: 'אין פעולה נדרשת – ניתן להעביר לארכיון במידת הצורך.',
+        new_bike: 'יש לעדכן היכן עומד תהליך הבנייה ולהעביר מידע בהתאם.',
+        test_bike: 'מומלץ ליצור קשר לקבלת משוב ולתאם את המשך התהליך.'
     };
 
     // --- Database (Supabase Cloud + Local Fallback for New Columns) ---
@@ -930,7 +970,13 @@
                 dropdown.dispatchEvent(new Event('change'));
             }
         },
-
+        
+        getDaysColor: (days) => {
+            if (days <= 2) return 'bg-gray-100 text-gray-600 border-gray-200';
+            if (days <= 5) return 'bg-orange-50 text-orange-600 border-orange-200';
+            return 'bg-red-50 text-red-600 border-red-200';
+        },
+        
         renderDashboard: () => {
             const t = app.tickets;
             // Count tickets by status
@@ -942,7 +988,7 @@
                 waiting_approval: t.filter(x => x.status === 'waiting_approval').length,
                 completed: t.filter(x => x.status === 'completed').length,
                 cancelled: t.filter(x => x.status === 'cancelled').length,
-                second_hand: app.bikes.length // Add this
+                second_hand: app.bikes.length
             };
 
             // Update DOM elements
@@ -953,18 +999,48 @@
             document.getElementById('stat-waiting_approval').innerText = counts.waiting_approval;
             document.getElementById('stat-completed').innerText = counts.completed;
             document.getElementById('stat-cancelled').innerText = counts.cancelled;
-            document.getElementById('stat-second_hand').innerText = counts.second_hand; // New
+            document.getElementById('stat-second_hand').innerText = counts.second_hand;
 
-            const recentBody = document.getElementById('dashboard-table-body');
-            recentBody.innerHTML = t.slice(0, 5).map(ticket => `
-                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="app.openTicket('${ticket.id}')">
-                    <td class="p-3 font-mono">#${ticket.ticketNumber}</td>
-                    <td class="p-3 font-medium">${ticket.customerName}</td>
-                    <td class="p-3 text-gray-600">${ticket.bikeModel}</td>
-                    <td class="p-3">${app.getStatusBadge(ticket.status)}</td>
-                    <td class="p-3 text-gray-500">${Utils.formatDate(ticket.createdAt).split(',')[0]}</td>
-                </tr>
-            `).join('');
+            // --- "What requires attention now" Logic ---
+            const attentionList = document.getElementById('attention-table-body');
+            
+            // Filter only relevant statuses (exclude cancelled)
+            // Sort by days elapsed descending (more days = more urgent)
+            const now = new Date();
+            const urgentTickets = t
+                .filter(x => x.status !== 'cancelled')
+                .map(ticket => {
+                    const updated = new Date(ticket.updatedAt || ticket.createdAt);
+                    const diffTime = Math.abs(now - updated);
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+                    return { ...ticket, diffDays };
+                })
+                .sort((a, b) => b.diffDays - a.diffDays) // Descending days
+                .slice(0, 10); // Top 10
+                
+            if (urgentTickets.length === 0) {
+                attentionList.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">אין פריטים הדורשים טיפול כרגע.</td></tr>`;
+            } else {
+                attentionList.innerHTML = urgentTickets.map(ticket => {
+                    const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
+                    const dayColorClass = app.getDaysColor(ticket.diffDays);
+                    
+                    return `
+                    <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="app.openTicket('${ticket.id}')">
+                        <td class="p-3 text-gray-800 font-medium">${ticket.customerName}</td>
+                        <td class="p-3 text-gray-600">${ticket.bikeModel}</td>
+                        <td class="p-3">${app.getStatusBadge(ticket.status)}</td>
+                        <td class="p-3 text-center">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${dayColorClass}">
+                                ${ticket.diffDays}
+                            </span>
+                        </td>
+                        <td class="p-3 text-sm text-gray-500 max-w-xs truncate" title="${actionText}">${actionText}</td>
+                    </tr>
+                    `;
+                }).join('');
+                lucide.createIcons();
+            }
         },
 
         renderTickets: () => {
