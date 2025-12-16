@@ -741,6 +741,11 @@
         activeTicketTab: 'details', // 'details', 'history', 'timeline'
         isEditingDetails: false,
         user: null,
+        
+        // 1) דגלים למניעת ריצות כפולות
+        started: false,
+        listenersBound: false,
+        refreshIntervalId: null,
 
         init: async () => {
             // AUTH CHECK
@@ -759,6 +764,15 @@
                     app.user = session.user;
                     app.startApp();
                 } else {
+                    // 3) איפוס דגלים ומחיקת Interval בעת יציאה
+                    app.started = false;
+                    app.listenersBound = false;
+                
+                    if (app.refreshIntervalId) {
+                      clearInterval(app.refreshIntervalId);
+                      app.refreshIntervalId = null;
+                    }
+                
                     app.user = null;
                     app.showLogin();
                 }
@@ -768,6 +782,10 @@
         },
 
         startApp: async () => {
+            // 2) הגנה מפני הרצה כפולה
+            if (app.started) return;
+            app.started = true;
+
             // 1) בדיקת הרשאה מול allowlist
             const { data: allowRow, error: allowErr } = await supabase
                 .from('allowed_users')
@@ -794,8 +812,11 @@
             app.setupListeners();
             router.navigate('dashboard');
             
-            // Auto refresh
-            setInterval(async () => {
+            // Auto refresh - ניקוי והגדרה מחדש
+            if (app.refreshIntervalId) {
+                clearInterval(app.refreshIntervalId);
+            }
+            app.refreshIntervalId = setInterval(async () => {
                 if(document.visibilityState === 'visible' && app.user) {
                     const freshData = await DB.getAll();
                     if (freshData.length !== app.tickets.length) {
@@ -830,13 +851,21 @@
         },
 
         setupListeners: () => {
+            // 4) הגנה מפני רישום כפול של מאזינים
+            if (app.listenersBound) return;
+            app.listenersBound = true;
+
             document.getElementById('tickets-search').addEventListener('input', app.renderTickets);
             document.getElementById('tickets-filter').addEventListener('change', app.renderTickets);
             const custSearch = document.getElementById('customers-search');
             if(custSearch) custSearch.addEventListener('input', app.renderCustomers);
             
-            document.getElementById('create-ticket-form').addEventListener('submit', async (e) => {
+            // 5) שימוש ב-onsubmit במקום addEventListener כדי למנוע כפילויות
+            const createTicketForm = document.getElementById('create-ticket-form');
+            createTicketForm.onsubmit = async (e) => {
                 e.preventDefault();
+                console.count("create-ticket submit fired"); // בדיקה בקונסול
+
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
                 
@@ -862,10 +891,11 @@
                 } catch(err) {
                     // השגיאה כבר מטופלת ב-DB
                 }
-            });
+            };
 
-            // Bike Form Listener
-            document.getElementById('bike-form').addEventListener('submit', (e) => {
+            // 6) תיקון דומה עבור טופס אופניים
+            const bikeForm = document.getElementById('bike-form');
+            bikeForm.onsubmit = (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
@@ -882,96 +912,8 @@
                 app.bikes = BikeDB.getAll();
                 app.renderBikes();
                 router.navigate('secondhand');
-            });
+            };
         },
-
-        // --- Bikes Module Functions ---
-        openCreateBike: () => {
-            const form = document.getElementById('bike-form');
-            form.reset();
-            form.querySelector('[name="id"]').value = ''; // Ensure ID is empty for new
-            document.getElementById('bike-form-title').innerText = 'כרטיס אופני יד שנייה - חדש';
-            document.getElementById('btn-delete-bike').classList.add('hidden');
-            router.navigate('bike-detail');
-        },
-
-        openBikeDetail: (id) => {
-            const bike = app.bikes.find(b => b.id === id);
-            if (!bike) return;
-            
-            const form = document.getElementById('bike-form');
-            form.reset();
-            
-            // Populate form
-            Object.keys(bike).forEach(key => {
-                const field = form.querySelector(`[name="${key}"]`);
-                if(field) field.value = bike[key];
-            });
-            form.querySelector('[name="id"]').value = bike.id;
-
-            document.getElementById('bike-form-title').innerText = `עריכת אופניים: ${bike.brand} ${bike.model}`;
-            document.getElementById('btn-delete-bike').classList.remove('hidden');
-            router.navigate('bike-detail');
-        },
-
-        deleteBike: () => {
-            const id = document.getElementById('bike-form').querySelector('[name="id"]').value;
-            if (id && confirm('האם למחוק אופניים אלו מהמלאי?')) {
-                BikeDB.delete(id);
-                app.bikes = BikeDB.getAll();
-                app.renderBikes();
-                Utils.showToast('הפריט נמחק');
-                router.navigate('secondhand');
-            }
-        },
-
-        renderBikes: () => {
-            const search = document.getElementById('bike-search').value.toLowerCase();
-            const brandFilter = document.getElementById('bike-filter-brand').value;
-            const sizeFilter = document.getElementById('bike-filter-size').value;
-
-            // Populate filters dynamically if needed (simplified here)
-            const brands = [...new Set(app.bikes.map(b => b.brand))];
-            const sizes = [...new Set(app.bikes.map(b => b.size))];
-            
-            // Note: In a real app, don't re-render options on every keystroke to avoid focus loss
-            // For now we assume filters are populated once or we accept simple re-render
-            
-            const filtered = app.bikes.filter(b => {
-                const matchSearch = (b.brand + b.model + b.sku).toLowerCase().includes(search);
-                const matchBrand = brandFilter === 'all' || b.brand === brandFilter;
-                const matchSize = sizeFilter === 'all' || b.size === sizeFilter;
-                return matchSearch && matchBrand && matchSize;
-            });
-
-            // Update Dropdowns only if empty (init)
-            const brandSelect = document.getElementById('bike-filter-brand');
-            if (brandSelect.children.length === 1) {
-                brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
-            }
-            const sizeSelect = document.getElementById('bike-filter-size');
-             if (sizeSelect.children.length === 1) {
-                sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
-            }
-
-            const tbody = document.getElementById('bikes-table-body');
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">לא נמצאו אופניים</td></tr>`;
-            } else {
-                tbody.innerHTML = filtered.map(b => `
-                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="app.openBikeDetail('${b.id}')">
-                        <td class="p-4 font-medium">${b.brand}</td>
-                        <td class="p-4">${b.model}</td>
-                        <td class="p-4 hidden md:table-cell text-gray-500">${b.color || '-'}</td>
-                        <td class="p-4">${b.size || '-'}</td>
-                        <td class="p-4 font-bold text-green-600">${Utils.formatCurrency(b.price)}</td>
-                        <td class="p-4"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-400"></i></td>
-                    </tr>
-                `).join('');
-                lucide.createIcons();
-            }
-        },
-
 
         // Get unique customers for autocomplete
         getCustomers: () => {
