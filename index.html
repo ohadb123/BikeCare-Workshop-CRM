@@ -768,6 +768,22 @@
         },
 
         startApp: async () => {
+            // 1) בדיקת הרשאה מול allowlist
+            const { data: allowRow, error: allowErr } = await supabase
+                .from('allowed_users')
+                .select('email')
+                .eq('email', app.user?.email || '')
+                .maybeSingle();
+
+            // אם אין שורה - המשתמש לא מורשה
+            if (allowErr || !allowRow) {
+                await supabase.auth.signOut();
+                app.user = null;
+                app.showLogin();
+                Utils.showToast('אין לך הרשאה להיכנס למערכת. פנה למנהל המערכת.', 'error');
+                return;
+            }
+
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-container').classList.remove('hidden');
             
