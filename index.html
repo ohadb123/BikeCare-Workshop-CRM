@@ -158,7 +158,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v7.0 (Auth)
+                    BikeCare v7.1 (Delete Fix)
                 </div>
             </div>
         </aside>
@@ -248,7 +248,7 @@
                             </h3>
                         </div>
                         
-                        <div class="overflow-auto custom-scroll flex-1 p-0">
+                        <div class="overflow-y-auto overflow-x-hidden custom-scroll flex-1 p-0 max-h-[60vh] md:max-h-none">
                             <table class="w-full text-right text-sm border-collapse">
                                 <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
                                     <tr>
@@ -700,6 +700,20 @@
                 if(tagNumber !== undefined) newExtras.tagNumber = tagNumber;
                 localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
             }
+        },
+        delete: async (id) => {
+            const { error } = await supabase
+                .from('tickets')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                console.error("שגיאה במחיקת תיקון:", error);
+                Utils.showToast("שגיאה במחיקת התיקון", "error");
+                throw error;
+            }
+
+            localStorage.removeItem(`ticket_extras_${id}`);
         }
     };
 
@@ -742,7 +756,7 @@
         isEditingDetails: false,
         user: null,
         
-        // 1) דגלים למניעת ריצות כפולות
+        // Flags to prevent double execution
         started: false,
         listenersBound: false,
         refreshIntervalId: null,
@@ -764,7 +778,6 @@
                     app.user = session.user;
                     app.startApp();
                 } else {
-                    // 3) איפוס דגלים ומחיקת Interval בעת יציאה
                     app.started = false;
                     app.listenersBound = false;
                 
@@ -782,7 +795,6 @@
         },
 
         startApp: async () => {
-            // 2) הגנה מפני הרצה כפולה
             if (app.started) return;
             app.started = true;
 
@@ -812,7 +824,7 @@
             app.setupListeners();
             router.navigate('dashboard');
             
-            // Auto refresh - ניקוי והגדרה מחדש
+            // Auto refresh
             if (app.refreshIntervalId) {
                 clearInterval(app.refreshIntervalId);
             }
@@ -851,7 +863,6 @@
         },
 
         setupListeners: () => {
-            // 4) הגנה מפני רישום כפול של מאזינים
             if (app.listenersBound) return;
             app.listenersBound = true;
 
@@ -860,11 +871,10 @@
             const custSearch = document.getElementById('customers-search');
             if(custSearch) custSearch.addEventListener('input', app.renderCustomers);
             
-            // 5) שימוש ב-onsubmit במקום addEventListener כדי למנוע כפילויות
             const createTicketForm = document.getElementById('create-ticket-form');
             createTicketForm.onsubmit = async (e) => {
                 e.preventDefault();
-                console.count("create-ticket submit fired"); // בדיקה בקונסול
+                console.count("create-ticket submit fired");
 
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
@@ -875,8 +885,12 @@
                 }
                 
                 try {
+                    // Check if ticketNumber (ID) exists
+                    const nextId = app.getNextTicketNumber();
+                    
                     await DB.add({
                         ...data,
+                        ticketNumber: nextId,
                         status: 'new',
                         quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false },
                         timeline: [],
@@ -893,7 +907,7 @@
                 }
             };
 
-            // 6) תיקון דומה עבור טופס אופניים
+            // Bike Form Listener
             const bikeForm = document.getElementById('bike-form');
             bikeForm.onsubmit = (e) => {
                 e.preventDefault();
@@ -1303,7 +1317,7 @@
              const newHistory = [...(app.currentTicket.history || []), {
                  date: new Date().toISOString(),
                  action: 'פרטים עודכנו',
-                 user: app.user ? app.user.email : 'משתמש'
+                 user: 'צוות'
              }];
              
              await DB.update(app.currentTicket.id, { ...updates, history: newHistory });
@@ -1324,7 +1338,7 @@
                 date: new Date().toISOString(),
                 action,
                 notes,
-                user: app.user ? app.user.email : 'טכנאי'
+                user: 'טכנאי'
             };
             
             const currentTimeline = app.currentTicket.timeline || [];
@@ -1334,6 +1348,26 @@
             app.currentTicket.timeline = updatedTimeline;
             form.reset();
             app.renderTicketDetail(); // Re-render to show new entry
+        },
+
+        deleteTicket: async () => {
+            if (!app.currentTicket) return;
+
+            const ok = confirm("האם למחוק את התיקון? פעולה זו לא ניתנת לשחזור.");
+            if (!ok) return;
+
+            try {
+                await DB.delete(app.currentTicket.id);
+
+                app.tickets = app.tickets.filter(t => t.id !== app.currentTicket.id);
+                app.currentTicket = null;
+
+                Utils.showToast("התיקון נמחק בהצלחה");
+                router.navigate('tickets');
+                app.renderTickets();
+            } catch (e) {
+                // שגיאה טופלה ב-DB
+            }
         },
 
         renderTicketDetail: () => {
