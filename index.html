@@ -800,13 +800,12 @@
         },
 
         signInWithGoogle: async () => {
+            const redirectTo = `${window.location.origin}/`; // תמיד הדומיין של Vercel
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                options: {
-                    redirectTo: window.location.href // Redirect back to this page
-                }
+                options: { redirectTo }
             });
-            if(error) Utils.showToast(error.message, 'error');
+            if (error) Utils.showToast(error.message, 'error');
         },
 
         signOut: async () => {
