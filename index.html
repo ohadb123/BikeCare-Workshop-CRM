@@ -158,7 +158,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v7.3 (Fix Syntax Error)
+                    BikeCare v7.4 (TagNumber Display)
                 </div>
             </div>
         </aside>
@@ -1453,6 +1453,17 @@
                         <span id="quote-total">0.00 ₪</span>
                     </div>
                 </div>
+                <!-- Signature -->
+                <div class="border rounded-lg p-4 bg-gray-50">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
+                    <div id="signature-area">
+                        ${ticket.quote.isSigned 
+                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="window.app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
+                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
+                               <button onclick="window.app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
+                        }
+                    </div>
+                </div>
             `;
             
             const timelineContent = `
@@ -1616,6 +1627,7 @@
             lucide.createIcons();
             if(window.app.activeTicketTab === 'details') {
                 window.app.renderQuoteItems();
+                if(!ticket.quote.isSigned) window.app.initCanvas();
             }
         },
 
@@ -1693,6 +1705,63 @@
             window.app.tickets = await DB.getAll(); // Refresh global list
             window.app.renderTicketDetail(); 
             Utils.showToast('סטטוס עודכן');
+        },
+
+        // Canvas Logic
+        initCanvas: () => {
+            const canvas = document.getElementById('sig-canvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Set styles for visibility
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000';
+            
+            let isDrawing = false;
+            
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                return {x, y};
+            }
+
+            const start = (e) => { isDrawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
+            const move = (e) => { 
+                if(!isDrawing) return; 
+                e.preventDefault(); 
+                const {x,y} = getPos(e); 
+                ctx.lineTo(x,y); 
+                ctx.stroke(); 
+            };
+            const end = () => { isDrawing = false; };
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            canvas.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start);
+            canvas.addEventListener('touchmove', move);
+            canvas.addEventListener('touchend', end);
+        },
+
+        saveSignature: () => {
+            const canvas = document.getElementById('sig-canvas');
+            const dataUrl = canvas.toDataURL();
+            window.app.currentTicket.quote.isSigned = true;
+            window.app.currentTicket.quote.signature = dataUrl;
+            window.app.currentTicket.quote.signedAt = new Date().toISOString();
+            window.app.saveQuote();
+            window.app.renderTicketDetail();
+        },
+
+        clearSignature: () => {
+            window.app.currentTicket.quote.isSigned = false;
+            window.app.currentTicket.quote.signature = null;
+            window.app.saveQuote();
+            window.app.renderTicketDetail();
         },
 
         // PDF Print
@@ -1803,7 +1872,13 @@
                         </div>
                     </div>
 
-                    <div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>
+                    ${ticket.quote.isSigned ? `
+                        <div class="signature-section">
+                            <img src="${ticket.quote.signature}" class="sig-img" alt="חתימה" />
+                            <div>חתימת לקוח</div>
+                            <div style="font-size: 12px; color: #666; margin-top: 5px;">נחתם בתאריך: ${Utils.formatDate(ticket.quote.signedAt)}</div>
+                        </div>
+                    ` : '<div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>'}
 
                     <div class="footer">
                         הופק על ידי מערכת BikeCare Workshop CRM
