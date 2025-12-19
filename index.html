@@ -111,14 +111,6 @@
             align-items: center;
             justify-content: center;
         }
-
-        /* Action Item Styling */
-        .action-item {
-            transition: background-color 0.2s;
-        }
-        .action-item:hover {
-            background-color: #f9fafb;
-        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
@@ -173,7 +165,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v8.1 (Full)
+                    BikeCare v9.0 (Archive Fix)
                 </div>
             </div>
         </aside>
@@ -1461,10 +1453,10 @@
             const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
             window.app.currentTicket = ticket;
-            window.app.isEditingDetails = false; // Reset edit mode
-            window.app.activeTicketTab = 'details'; // Reset tab
-            window.app.renderTicketDetail(); // <--- This line was fixed (changed 'app.' to 'window.app.')
-            router.navigate('ticket-detail'); // Then switch view
+            window.app.isEditingDetails = false;
+            window.app.activeTicketTab = 'details';
+            window.app.renderTicketDetail();
+            router.navigate('ticket-detail');
         },
 
         switchTicketTab: (tabName) => {
@@ -1538,13 +1530,11 @@
             if (!ok) return;
 
             try {
-                // עדכון שדה is_archived ושינוי סטטוס ל'archived'
                 await DB.update(window.app.currentTicket.id, { 
                     is_archived: true,
                     status: 'archived' 
                 });
 
-                // עדכון לוקאלי
                 const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
                 if (ticketIndex > -1) {
                     window.app.tickets[ticketIndex].is_archived = true;
@@ -1781,12 +1771,11 @@
                             <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
                             <div class="flex flex-wrap gap-2">
                                 ${Object.entries(STATUSES)
-                                    .filter(([k]) => k !== 'archived') // הסתרת כפתור 'בארכיון'
+                                    .filter(([k]) => k !== 'archived') 
                                     .map(([k, v]) => `
                                     <button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>
                                 `).join('')}
                                 
-                                <!-- הצגת אינדיקציה בלבד אם התיקון כבר בארכיון -->
                                 ${ticket.status === 'archived' ? 
                                     `<span class="px-3 py-1 text-xs rounded-full border bg-gray-200 text-gray-600 border-gray-300">בארכיון</span>` 
                                 : ''}
