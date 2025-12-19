@@ -1461,10 +1461,10 @@
             const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
             window.app.currentTicket = ticket;
-            window.app.isEditingDetails = false;
-            window.app.activeTicketTab = 'details';
-            window.app.renderTicketDetail();
-            router.navigate('ticket-detail');
+            window.app.isEditingDetails = false; // Reset edit mode
+            window.app.activeTicketTab = 'details'; // Reset tab
+            window.app.renderTicketDetail(); // <--- This line was fixed (changed 'app.' to 'window.app.')
+            router.navigate('ticket-detail'); // Then switch view
         },
 
         switchTicketTab: (tabName) => {
