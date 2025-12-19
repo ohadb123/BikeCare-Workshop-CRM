@@ -121,7 +121,7 @@
             <h1 class="text-3xl font-bold text-gray-800 mb-2">BikeCare CRM</h1>
             <p class="text-gray-500 mb-8">מערכת לניהול סדנת אופניים</p>
             
-            <button onclick="app.signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg hover:bg-gray-50 transition shadow-sm">
+            <button onclick="window.app.signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg hover:bg-gray-50 active:bg-gray-100 active:scale-95 transform transition-all shadow-sm cursor-pointer">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
                 התחבר באמצעות Google
             </button>
@@ -154,11 +154,11 @@
             </nav>
 
             <div class="p-4 border-t">
-                <button onclick="app.signOut()" class="w-full flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm p-2 rounded hover:bg-red-50 transition">
+                <button onclick="window.app.signOut()" class="w-full flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm p-2 rounded hover:bg-red-50 transition">
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v7.1 (Delete Fix)
+                    BikeCare v7.3 (Fix Syntax Error)
                 </div>
             </div>
         </aside>
@@ -181,7 +181,7 @@
                 <div id="view-dashboard" class="view-section active">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">דשבורד ניהולי</h2>
-                        <button onclick="app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
                             <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
                         </button>
                     </div>
@@ -192,27 +192,27 @@
                     </h3>
                     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
                         <!-- New -->
-                        <div onclick="app.filterTicketsByStatus('new')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-blue-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('new')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-blue-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">חדש</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-new">0</div>
                         </div>
                         <!-- Waiting Approval -->
-                        <div onclick="app.filterTicketsByStatus('waiting_approval')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-purple-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('waiting_approval')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-purple-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">ממתין לאישור</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-waiting_approval">0</div>
                         </div>
                         <!-- In Progress -->
-                        <div onclick="app.filterTicketsByStatus('in_progress')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-yellow-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('in_progress')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-yellow-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">בטיפול</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-in_progress">0</div>
                         </div>
                         <!-- Completed -->
-                        <div onclick="app.filterTicketsByStatus('completed')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-green-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('completed')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-green-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">הושלם</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-completed">0</div>
                         </div>
                         <!-- Cancelled -->
-                        <div onclick="app.filterTicketsByStatus('cancelled')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-gray-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('cancelled')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-gray-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">בוטל</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-cancelled">0</div>
                         </div>
@@ -224,12 +224,12 @@
                     </h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
                         <!-- New Bike (Custom Status) -->
-                        <div onclick="app.filterTicketsByStatus('new_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-teal-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('new_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-teal-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">אופניים חדשים</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-new_bike">0</div>
                         </div>
                         <!-- Test Bike (Custom Status) -->
-                        <div onclick="app.filterTicketsByStatus('test_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-orange-500 h-full flex flex-col justify-between">
+                        <div onclick="window.app.filterTicketsByStatus('test_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-orange-500 h-full flex flex-col justify-between">
                             <div class="text-gray-500 text-sm mb-1">אופני מבחן</div>
                             <div class="text-2xl font-bold text-gray-800" id="stat-test_bike">0</div>
                         </div>
@@ -248,7 +248,7 @@
                             </h3>
                         </div>
                         
-                        <div class="overflow-y-auto overflow-x-hidden custom-scroll flex-1 p-0 max-h-[60vh] md:max-h-none">
+                        <div class="overflow-auto custom-scroll flex-1 p-0">
                             <table class="w-full text-right text-sm border-collapse">
                                 <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
                                     <tr>
@@ -278,7 +278,7 @@
                 <div id="view-tickets" class="view-section">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <h2 class="text-2xl font-bold text-gray-800">ניהול תיקונים</h2>
-                        <button onclick="app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
+                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
                             <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
                         </button>
                     </div>
@@ -314,23 +314,23 @@
                             <table class="w-full text-right">
                                 <thead class="bg-gray-50 text-gray-600 border-b">
                                     <tr>
-                                        <th class="p-4 w-24 sortable" onclick="app.handleSort('ticketNumber')">
+                                        <th class="p-4 w-24 sortable" onclick="window.app.handleSort('ticketNumber')">
                                             <div class="flex items-center gap-1"># <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-ticketNumber"></i></div>
                                         </th>
-                                        <th class="p-4 sortable" onclick="app.handleSort('customerName')">
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('customerName')">
                                             <div class="flex items-center gap-1">לקוח <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-customerName"></i></div>
                                         </th>
                                         <th class="p-4 hidden md:table-cell">טלפון</th>
-                                        <th class="p-4 sortable" onclick="app.handleSort('bikeModel')">
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('bikeModel')">
                                             <div class="flex items-center gap-1">דגם <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-bikeModel"></i></div>
                                         </th>
-                                        <th class="p-4 sortable" onclick="app.handleSort('status')">
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('status')">
                                             <div class="flex items-center gap-1">סטטוס <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-status"></i></div>
                                         </th>
-                                        <th class="p-4 hidden md:table-cell sortable" onclick="app.handleSort('priority')">
+                                        <th class="p-4 hidden md:table-cell sortable" onclick="window.app.handleSort('priority')">
                                             <div class="flex items-center gap-1">דחיפות <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-priority"></i></div>
                                         </th>
-                                        <th class="p-4 sortable" onclick="app.handleSort('createdAt')">
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('createdAt')">
                                             <div class="flex items-center gap-1">תאריך <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-createdAt"></i></div>
                                         </th>
                                     </tr>
@@ -367,7 +367,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div class="relative">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">שם לקוח *</label>
-                                    <input name="customerName" list="customers-datalist" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500" placeholder="התחל להקליד שם לקוח..." oninput="app.onCustomerNameInput(this)">
+                                    <input name="customerName" list="customers-datalist" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500" placeholder="התחל להקליד שם לקוח..." oninput="window.app.onCustomerNameInput(this)">
                                     <datalist id="customers-datalist"></datalist>
                                 </div>
                                 <div>
@@ -452,7 +452,7 @@
                 <div id="view-secondhand" class="view-section">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">ניהול מלאי אופני יד שנייה</h2>
-                        <button onclick="app.openCreateBike()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm font-medium">
+                        <button onclick="window.app.openCreateBike()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm font-medium">
                             <i data-lucide="plus" class="w-4 h-4"></i> אופניים חדשים למלאי
                         </button>
                     </div>
@@ -460,13 +460,13 @@
                     <div class="bg-white p-4 rounded-lg shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-center">
                          <div class="relative flex-1 w-full">
                             <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
-                            <input type="text" id="bike-search" placeholder="חיפוש לפי מותג, דגם או מק״ט..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="app.renderBikes()">
+                            <input type="text" id="bike-search" placeholder="חיפוש לפי מותג, דגם או מק״ט..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="window.app.renderBikes()">
                         </div>
                         <div class="flex gap-2 w-full md:w-auto">
-                            <select id="bike-filter-brand" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="app.renderBikes()">
+                            <select id="bike-filter-brand" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="window.app.renderBikes()">
                                 <option value="all">כל המותגים</option>
                             </select>
-                            <select id="bike-filter-size" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="app.renderBikes()">
+                            <select id="bike-filter-size" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="window.app.renderBikes()">
                                 <option value="all">כל המידות</option>
                             </select>
                         </div>
@@ -574,7 +574,7 @@
                             </div>
 
                             <div class="pt-6 flex justify-between items-center">
-                                <button type="button" id="btn-delete-bike" onclick="app.deleteBike()" class="text-red-600 hover:bg-red-50 px-4 py-2 rounded hidden">
+                                <button type="button" id="btn-delete-bike" onclick="window.app.deleteBike()" class="text-red-600 hover:bg-red-50 px-4 py-2 rounded hidden">
                                     <i data-lucide="trash-2" class="w-4 h-4 inline"></i> מחק פריט
                                 </button>
                                 <div class="flex gap-3">
@@ -597,7 +597,7 @@
     // --- הגדרות Supabase ---
     const supabaseUrl = 'https://czxicysnfwvxapipzysg.supabase.co'; 
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6eGljeXNuZnd2eGFwaXB6eXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDY3MTYsImV4cCI6MjA4MDYyMjcxNn0.cgk7AxkRzkptv0lzj-63J2vBqj1dqB3OCk5qeq9BQqo';
-    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    var sb = window.supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Utils ---
     const Utils = {
@@ -633,26 +633,30 @@
     const DB = {
         // שליפת כל הנתונים מהענן ומיזוג עם נתונים מקומיים
         getAll: async () => {
-            const { data, error } = await supabase
-                .from('tickets')
-                .select('*')
-                .order('createdAt', { ascending: false });
-            
-            if (error) {
-                console.error("שגיאה בטעינת נתונים:", error);
-                Utils.showToast("שגיאה בטעינת נתונים", "error");
+            if (!sb) return [];
+            try {
+                const { data, error } = await sb
+                    .from('tickets')
+                    .select('*')
+                    .order('createdAt', { ascending: false });
+                
+                if (error) {
+                    console.error("Supabase Error:", error);
+                    return [];
+                }
+                
+                // Merge with local extras
+                return data.map(t => {
+                    const extras = JSON.parse(localStorage.getItem(`ticket_extras_${t.id}`) || '{}');
+                    return { ...t, ...extras };
+                });
+            } catch (e) {
+                console.error("DB Connection Error:", e);
                 return [];
             }
-            
-            // Merge with local extras
-            return data.map(t => {
-                const extras = JSON.parse(localStorage.getItem(`ticket_extras_${t.id}`) || '{}');
-                return { ...t, ...extras };
-            });
         },
         // הוספת תיקון חדש
         add: async (ticket) => {
-            // Split fields: Core (Supabase) vs Extras (Local)
             const { history, timeline, tagNumber, ...core } = ticket;
             
             const newTicket = { 
@@ -662,7 +666,7 @@
                 ...core 
             };
             
-            const { error } = await supabase.from('tickets').insert([newTicket]);
+            const { error } = await sb.from('tickets').insert([newTicket]);
             
             if (error) {
                 console.error("שגיאה בשמירה:", error);
@@ -670,7 +674,6 @@
                 throw error;
             }
             
-            // Save extras locally
             if(history || timeline || tagNumber) {
                  localStorage.setItem(`ticket_extras_${newTicket.id}`, JSON.stringify({ history, timeline, tagNumber }));
             }
@@ -681,17 +684,12 @@
         update: async (id, updates) => {
             const { history, timeline, tagNumber, ...coreUpdates } = updates;
             
-            // Update Core in Supabase
             if (Object.keys(coreUpdates).length > 0) {
                 const updateData = { ...coreUpdates, updatedAt: new Date().toISOString() };
-                const { error } = await supabase.from('tickets').update(updateData).eq('id', id);
-                if (error) {
-                    console.error("שגיאה בעדכון:", error);
-                    Utils.showToast("שגיאה בעדכון", "error");
-                }
+                const { error } = await sb.from('tickets').update(updateData).eq('id', id);
+                if (error) console.error("Update Error:", error);
             }
             
-            // Update Extras in LocalStorage
             if (history || timeline || tagNumber !== undefined) {
                 const currentExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
                 const newExtras = { ...currentExtras };
@@ -702,7 +700,7 @@
             }
         },
         delete: async (id) => {
-            const { error } = await supabase
+            const { error } = await sb
                 .from('tickets')
                 .delete()
                 .eq('id', id);
@@ -745,49 +743,47 @@
     };
 
     // --- App Logic ---
-    const app = {
+    window.app = {
         tickets: [],
         bikes: [],
         currentTicket: null,
         currentCustomer: null,
         currentBike: null,
-        sortState: { field: 'createdAt', dir: 'desc' }, // State for sorting
-        activeTicketTab: 'details', // 'details', 'history', 'timeline'
+        sortState: { field: 'createdAt', dir: 'desc' },
+        activeTicketTab: 'details',
         isEditingDetails: false,
         user: null,
         
-        // Flags to prevent double execution
+        // Flags
         started: false,
         listenersBound: false,
         refreshIntervalId: null,
 
         init: async () => {
-            // AUTH CHECK
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session) {
-                app.user = session.user;
-                app.startApp();
-            } else {
-                app.showLogin();
+            if(!sb) {
+                alert("Supabase client failed to initialize. Check console.");
+                return;
             }
 
-            // Listener for auth state changes
-            supabase.auth.onAuthStateChange((event, session) => {
+            const { data: { session } } = await sb.auth.getSession();
+            
+            if (session) {
+                window.app.user = session.user;
+                window.app.startApp();
+            } else {
+                window.app.showLogin();
+            }
+
+            sb.auth.onAuthStateChange((event, session) => {
                 if (session) {
-                    app.user = session.user;
-                    app.startApp();
+                    window.app.user = session.user;
+                    window.app.startApp();
                 } else {
-                    app.started = false;
-                    app.listenersBound = false;
-                
-                    if (app.refreshIntervalId) {
-                      clearInterval(app.refreshIntervalId);
-                      app.refreshIntervalId = null;
-                    }
-                
-                    app.user = null;
-                    app.showLogin();
+                    window.app.started = false;
+                    window.app.listenersBound = false;
+                    if (window.app.refreshIntervalId) clearInterval(window.app.refreshIntervalId);
+                    window.app.user = null;
+                    window.app.showLogin();
                 }
             });
             
@@ -795,21 +791,20 @@
         },
 
         startApp: async () => {
-            if (app.started) return;
-            app.started = true;
+            if (window.app.started) return;
+            window.app.started = true;
 
-            // 1) בדיקת הרשאה מול allowlist
-            const { data: allowRow, error: allowErr } = await supabase
+            // Auth Check (Allowlist)
+            const { data: allowRow, error: allowErr } = await sb
                 .from('allowed_users')
                 .select('email')
-                .eq('email', app.user?.email || '')
+                .eq('email', window.app.user?.email || '')
                 .maybeSingle();
 
-            // אם אין שורה - המשתמש לא מורשה
             if (allowErr || !allowRow) {
-                await supabase.auth.signOut();
-                app.user = null;
-                app.showLogin();
+                await sb.auth.signOut();
+                window.app.user = null;
+                window.app.showLogin();
                 Utils.showToast('אין לך הרשאה להיכנס למערכת. פנה למנהל המערכת.', 'error');
                 return;
             }
@@ -817,27 +812,23 @@
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-container').classList.remove('hidden');
             
-            // Load Data
-            app.tickets = await DB.getAll();
-            app.bikes = BikeDB.getAll();
+            window.app.tickets = await DB.getAll();
+            window.app.bikes = BikeDB.getAll();
             
-            app.setupListeners();
+            window.app.setupListeners();
             router.navigate('dashboard');
             
-            // Auto refresh
-            if (app.refreshIntervalId) {
-                clearInterval(app.refreshIntervalId);
-            }
-            app.refreshIntervalId = setInterval(async () => {
-                if(document.visibilityState === 'visible' && app.user) {
+            if (window.app.refreshIntervalId) clearInterval(window.app.refreshIntervalId);
+            window.app.refreshIntervalId = setInterval(async () => {
+                if(document.visibilityState === 'visible' && window.app.user) {
                     const freshData = await DB.getAll();
-                    if (freshData.length !== app.tickets.length) {
-                          app.tickets = freshData;
+                    if (freshData.length !== window.app.tickets.length) {
+                          window.app.tickets = freshData;
                           const currentView = document.querySelector('.view-section.active').id;
-                          if(currentView === 'view-dashboard') app.renderDashboard();
-                          if(currentView === 'view-tickets') app.renderTickets();
+                          if(currentView === 'view-dashboard') window.app.renderDashboard();
+                          if(currentView === 'view-tickets') window.app.renderTickets();
                     } else {
-                        app.tickets = freshData;
+                        window.app.tickets = freshData;
                     }
                 }
             }, 10000);
@@ -849,8 +840,8 @@
         },
 
         signInWithGoogle: async () => {
-            const redirectTo = `${window.location.origin}/`; // תמיד הדומיין של Vercel
-            const { data, error } = await supabase.auth.signInWithOAuth({
+            const redirectTo = `${window.location.origin}/`; 
+            const { data, error } = await sb.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo }
             });
@@ -858,18 +849,18 @@
         },
 
         signOut: async () => {
-            await supabase.auth.signOut();
+            await sb.auth.signOut();
             window.location.reload();
         },
 
         setupListeners: () => {
-            if (app.listenersBound) return;
-            app.listenersBound = true;
+            if (window.app.listenersBound) return;
+            window.app.listenersBound = true;
 
-            document.getElementById('tickets-search').addEventListener('input', app.renderTickets);
-            document.getElementById('tickets-filter').addEventListener('change', app.renderTickets);
+            document.getElementById('tickets-search').addEventListener('input', window.app.renderTickets);
+            document.getElementById('tickets-filter').addEventListener('change', window.app.renderTickets);
             const custSearch = document.getElementById('customers-search');
-            if(custSearch) custSearch.addEventListener('input', app.renderCustomers);
+            if(custSearch) custSearch.addEventListener('input', window.app.renderCustomers);
             
             const createTicketForm = document.getElementById('create-ticket-form');
             createTicketForm.onsubmit = async (e) => {
@@ -879,14 +870,12 @@
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
                 
-                // Ensure ticketNumber is number type for consistency
                 if (data.ticketNumber) {
                     data.ticketNumber = parseInt(data.ticketNumber);
                 }
                 
                 try {
-                    // Check if ticketNumber (ID) exists
-                    const nextId = app.getNextTicketNumber();
+                    const nextId = window.app.getNextTicketNumber();
                     
                     await DB.add({
                         ...data,
@@ -894,27 +883,25 @@
                         status: 'new',
                         quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false },
                         timeline: [],
-                        history: [{date: new Date().toISOString(), action: 'נוצר', user: app.user.email}]
+                        history: [{date: new Date().toISOString(), action: 'נוצר', user: window.app.user.email}]
                     });
                     
-                    // רענון הנתונים
-                    app.tickets = await DB.getAll();
+                    window.app.tickets = await DB.getAll();
                     e.target.reset();
                     Utils.showToast('כרטיס נפתח בהצלחה');
                     router.navigate('tickets');
                 } catch(err) {
-                    // השגיאה כבר מטופלת ב-DB
+                    console.error(err);
                 }
             };
 
-            // Bike Form Listener
             const bikeForm = document.getElementById('bike-form');
             bikeForm.onsubmit = (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const data = Object.fromEntries(formData.entries());
                 const id = data.id; 
-                delete data.id; // clean up
+                delete data.id;
 
                 if (id) {
                     BikeDB.update(id, data);
@@ -923,18 +910,16 @@
                     BikeDB.add(data);
                     Utils.showToast('אופניים נוספו למלאי');
                 }
-                app.bikes = BikeDB.getAll();
-                app.renderBikes();
+                window.app.bikes = BikeDB.getAll();
+                window.app.renderBikes();
                 router.navigate('secondhand');
             };
         },
 
-        // Get unique customers for autocomplete
         getCustomers: () => {
             const custMap = new Map();
-            app.tickets.forEach(t => {
+            window.app.tickets.forEach(t => {
                 if(t.customerName && t.customerPhone) {
-                    // Use phone as unique key
                     if(!custMap.has(t.customerPhone)) {
                          custMap.set(t.customerPhone, {
                              name: t.customerName,
@@ -947,10 +932,9 @@
             return Array.from(custMap.values());
         },
 
-        // Autocomplete handler
         onCustomerNameInput: (input) => {
             const val = input.value;
-            const customers = app.getCustomers();
+            const customers = window.app.getCustomers();
             const found = customers.find(c => c.name === val);
             
             if (found) {
@@ -961,25 +945,20 @@
             }
         },
 
-        // Helper to calc next ID
         getNextTicketNumber: () => {
-            const numbers = app.tickets.map(t => parseInt(t.ticketNumber) || 0);
+            const numbers = window.app.tickets.map(t => parseInt(t.ticketNumber) || 0);
             const max = numbers.length > 0 ? Math.max(...numbers) : 0;
-            // Start from 2400 if max is low, else continue sequence
             return Math.max(max + 1, 2400);
         },
 
-        // Sorting Helper
         handleSort: (field) => {
-            if (app.sortState.field === field) {
-                // Toggle direction
-                app.sortState.dir = app.sortState.dir === 'asc' ? 'desc' : 'asc';
+            if (window.app.sortState.field === field) {
+                window.app.sortState.dir = window.app.sortState.dir === 'asc' ? 'desc' : 'asc';
             } else {
-                // New field, default to asc
-                app.sortState.field = field;
-                app.sortState.dir = 'asc';
+                window.app.sortState.field = field;
+                window.app.sortState.dir = 'asc';
             }
-            app.renderTickets();
+            window.app.renderTickets();
         },
 
         getPriorityValue: (p) => {
@@ -987,20 +966,17 @@
             return map[p] || 0;
         },
 
-        // New Ticket Navigation Helper
         openCreateTicket: (prefillData = null) => {
             router.navigate('create-ticket');
             const form = document.getElementById('create-ticket-form');
             if(form) {
                  form.reset();
-                 // Set next ID
-                 const nextId = app.getNextTicketNumber();
+                 const nextId = window.app.getNextTicketNumber();
                  form.querySelector('[name="ticketNumber"]').value = nextId;
 
-                 // Populate datalist
                  const datalist = document.getElementById('customers-datalist');
                  if(datalist) {
-                     const customers = app.getCustomers();
+                     const customers = window.app.getCustomers();
                      datalist.innerHTML = customers.map(c => `<option value="${c.name}">${c.phone}</option>`).join('');
                  }
             }
@@ -1012,13 +988,11 @@
             }
         },
 
-        // Filter tickets from dashboard click
         filterTicketsByStatus: (status) => {
             router.navigate('tickets');
             const dropdown = document.getElementById('tickets-filter');
             if(dropdown) {
                 dropdown.value = status;
-                // Dispatch change event so the listener picks it up
                 dropdown.dispatchEvent(new Event('change'));
             }
         },
@@ -1030,8 +1004,7 @@
         },
         
         renderDashboard: () => {
-            const t = app.tickets;
-            // Count tickets by status
+            const t = window.app.tickets;
             const counts = {
                 new: t.filter(x => x.status === 'new').length,
                 new_bike: t.filter(x => x.status === 'new_bike').length,
@@ -1040,10 +1013,9 @@
                 waiting_approval: t.filter(x => x.status === 'waiting_approval').length,
                 completed: t.filter(x => x.status === 'completed').length,
                 cancelled: t.filter(x => x.status === 'cancelled').length,
-                second_hand: app.bikes.length
+                second_hand: window.app.bikes.length
             };
 
-            // Update DOM elements
             document.getElementById('stat-new').innerText = counts.new;
             document.getElementById('stat-new_bike').innerText = counts.new_bike;
             document.getElementById('stat-test_bike').innerText = counts.test_bike;
@@ -1053,35 +1025,37 @@
             document.getElementById('stat-cancelled').innerText = counts.cancelled;
             document.getElementById('stat-second_hand').innerText = counts.second_hand;
 
-            // --- "What requires attention now" Logic ---
             const attentionList = document.getElementById('attention-table-body');
-            
-            // Filter only relevant statuses (exclude cancelled)
-            // Sort by days elapsed descending (more days = more urgent)
             const now = new Date();
             const urgentTickets = t
-                .filter(x => x.status !== 'cancelled')
                 .map(ticket => {
                     const updated = new Date(ticket.updatedAt || ticket.createdAt);
                     const diffTime = Math.abs(now - updated);
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
                     return { ...ticket, diffDays };
                 })
-                .sort((a, b) => b.diffDays - a.diffDays) // Descending days
-                .slice(0, 10); // Top 10
+                .filter(ticket => {
+                    if (ticket.status === 'cancelled' || ticket.status === 'completed') return false;
+                    if (ticket.status === 'new') {
+                        return ticket.diffDays >= 2;
+                    }
+                    return true;
+                })
+                .sort((a, b) => b.diffDays - a.diffDays)
+                .slice(0, 10);
                 
             if (urgentTickets.length === 0) {
-                attentionList.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">אין פריטים הדורשים טיפול כרגע.</td></tr>`;
+                attentionList.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>`;
             } else {
                 attentionList.innerHTML = urgentTickets.map(ticket => {
                     const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
-                    const dayColorClass = app.getDaysColor(ticket.diffDays);
+                    const dayColorClass = window.app.getDaysColor(ticket.diffDays);
                     
                     return `
-                    <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="app.openTicket('${ticket.id}')">
+                    <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="window.app.openTicket('${ticket.id}')">
                         <td class="p-3 text-gray-800 font-medium">${ticket.customerName}</td>
                         <td class="p-3 text-gray-600">${ticket.bikeModel}</td>
-                        <td class="p-3">${app.getStatusBadge(ticket.status)}</td>
+                        <td class="p-3">${window.app.getStatusBadge(ticket.status)}</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${dayColorClass}">
                                 ${ticket.diffDays}
@@ -1103,7 +1077,7 @@
             const filter = document.getElementById('tickets-filter').value;
             const priorityFilter = document.getElementById('priority-filter').value;
             
-            let filtered = app.tickets.filter(t => {
+            let filtered = window.app.tickets.filter(t => {
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
                                     (t.ticketNumber || '').toString().includes(search) ||
                                     (t.bikeModel || '').toLowerCase().includes(search) ||
@@ -1113,16 +1087,14 @@
                 return matchSearch && matchFilter && matchPriority;
             });
 
-            // Sorting Logic
-            const { field, dir } = app.sortState;
+            const { field, dir } = window.app.sortState;
             filtered.sort((a, b) => {
                 let valA = a[field];
                 let valB = b[field];
 
-                // Special handling
                 if (field === 'priority') {
-                    valA = app.getPriorityValue(valA);
-                    valB = app.getPriorityValue(valB);
+                    valA = window.app.getPriorityValue(valA);
+                    valB = window.app.getPriorityValue(valB);
                 } else if (field === 'createdAt') {
                     valA = new Date(valA);
                     valB = new Date(valB);
@@ -1136,7 +1108,6 @@
                 return 0;
             });
 
-            // Update Header Icons
             document.querySelectorAll('.sort-icon').forEach(icon => {
                 icon.setAttribute('data-lucide', 'arrow-up-down');
                 icon.classList.remove('text-blue-600');
@@ -1155,13 +1126,13 @@
             }
 
             tbody.innerHTML = filtered.map(t => `
-                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="app.openTicket('${t.id}')">
+                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${t.id}')">
                     <td class="p-4 font-mono font-bold text-blue-600">#${t.ticketNumber}</td>
                     <td class="p-4 font-medium">${t.customerName}</td>
                     <td class="p-4 hidden md:table-cell text-gray-600">${t.customerPhone}</td>
                     <td class="p-4 text-gray-800">${t.bikeModel}</td>
-                    <td class="p-4">${app.getStatusBadge(t.status)}</td>
-                    <td class="p-4 hidden md:table-cell">${app.getPriorityLabel(t.priority)}</td>
+                    <td class="p-4">${window.app.getStatusBadge(t.status)}</td>
+                    <td class="p-4 hidden md:table-cell">${window.app.getPriorityLabel(t.priority)}</td>
                     <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdAt)}</td>
                 </tr>
             `).join('');
@@ -1172,7 +1143,7 @@
             const search = searchInput ? searchInput.value.toLowerCase() : '';
             const custMap = new Map();
             
-            app.tickets.forEach(t => {
+            window.app.tickets.forEach(t => {
                 if(!t.customerPhone) return;
                 if(!custMap.has(t.customerPhone)) {
                     custMap.set(t.customerPhone, { 
@@ -1195,7 +1166,7 @@
             const tbody = document.getElementById('customers-table-body');
             if(tbody) {
                 tbody.innerHTML = customers.map(c => `
-                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="app.openCustomer('${c.phone}')">
+                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openCustomer('${c.phone}')">
                         <td class="p-4 font-medium">${c.name}</td>
                         <td class="p-4">${c.phone}</td>
                         <td class="p-4 hidden md:table-cell text-gray-500">${c.email || '-'}</td>
@@ -1207,7 +1178,7 @@
         },
 
         openCustomer: (phone) => {
-            const tickets = app.tickets.filter(t => t.customerPhone === phone).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const tickets = window.app.tickets.filter(t => t.customerPhone === phone).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
             if(tickets.length === 0) return;
             const latest = tickets[0];
             
@@ -1216,7 +1187,7 @@
                 phone: latest.customerPhone,
                 email: latest.customerEmail
             };
-            app.currentCustomer = customer;
+            window.app.currentCustomer = customer;
 
             const container = document.getElementById('view-customer-detail');
             container.innerHTML = `
@@ -1228,7 +1199,7 @@
                                 <span class="flex items-center gap-1"><i data-lucide="phone" class="w-4 text-blue-500"></i> ${customer.phone}</span>
                                 ${customer.email ? `<span class="flex items-center gap-1"><i data-lucide="mail" class="w-4 text-blue-500"></i> ${customer.email}</span>` : ''}
                             </div>
-                            <button onclick="app.openCreateTicket({name: '${customer.name}', phone: '${customer.phone}', email: '${customer.email || ''}'})" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                            <button onclick="window.app.openCreateTicket({name: '${customer.name}', phone: '${customer.phone}', email: '${customer.email || ''}'})" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
                                 <i data-lucide="plus" class="w-4 h-4"></i> פתח תיקון חדש ללקוח זה
                             </button>
                         </div>
@@ -1245,7 +1216,7 @@
                         
                         <div class="space-y-3">
                             ${tickets.map(t => `
-                                <div onclick="app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
+                                <div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2 mb-1">
                                             <span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span>
@@ -1254,7 +1225,7 @@
                                         <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
                                     </div>
                                     <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                        ${app.getStatusBadge(t.status)}
+                                        ${window.app.getStatusBadge(t.status)}
                                         <div class="text-xs text-gray-500 flex items-center gap-1">
                                             <i data-lucide="calendar" class="w-3"></i>
                                             ${Utils.formatDate(t.createdAt).split(',')[0]}
@@ -1273,27 +1244,26 @@
         },
 
         openTicket: (id) => {
-            const ticket = app.tickets.find(t => t.id === id);
+            const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
-            app.currentTicket = ticket;
-            app.isEditingDetails = false; // Reset edit mode
-            app.activeTicketTab = 'details'; // Reset tab
-            app.renderTicketDetail(); // Render content
-            router.navigate('ticket-detail'); // Then switch view
+            window.app.currentTicket = ticket;
+            window.app.isEditingDetails = false;
+            window.app.activeTicketTab = 'details';
+            window.app.renderTicketDetail();
+            router.navigate('ticket-detail');
         },
 
         switchTicketTab: (tabName) => {
-            app.activeTicketTab = tabName;
-            app.renderTicketDetail();
+            window.app.activeTicketTab = tabName;
+            window.app.renderTicketDetail();
         },
         
         toggleEditDetails: () => {
-            app.isEditingDetails = !app.isEditingDetails;
-            app.renderTicketDetail();
+            window.app.isEditingDetails = !window.app.isEditingDetails;
+            window.app.renderTicketDetail();
         },
         
         saveTicketDetails: async () => {
-             // Gather data from inputs
              const container = document.getElementById('view-ticket-detail');
              const name = container.querySelector('[data-field="customerName"]').value;
              const phone = container.querySelector('[data-field="customerPhone"]').value;
@@ -1301,9 +1271,7 @@
              const bike = container.querySelector('[data-field="bikeModel"]').value;
              const issue = container.querySelector('[data-field="issueDescription"]').value;
              const tagNum = container.querySelector('[data-field="tagNumber"]').value;
-             // ticketNumber is NOT updated in save, it's fixed
              
-             // Update logic
              const updates = {
                  customerName: name,
                  customerPhone: phone,
@@ -1313,17 +1281,16 @@
                  tagNumber: tagNum
              };
              
-             // Add history
-             const newHistory = [...(app.currentTicket.history || []), {
+             const newHistory = [...(window.app.currentTicket.history || []), {
                  date: new Date().toISOString(),
                  action: 'פרטים עודכנו',
-                 user: 'צוות'
+                 user: window.app.user ? window.app.user.email : 'צוות'
              }];
              
-             await DB.update(app.currentTicket.id, { ...updates, history: newHistory });
-             app.currentTicket = { ...app.currentTicket, ...updates, history: newHistory };
-             app.isEditingDetails = false;
-             app.renderTicketDetail();
+             await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
+             window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
+             window.app.isEditingDetails = false;
+             window.app.renderTicketDetail();
              Utils.showToast("הפרטים עודכנו בהצלחה");
         },
         
@@ -1338,41 +1305,121 @@
                 date: new Date().toISOString(),
                 action,
                 notes,
-                user: 'טכנאי'
+                user: window.app.user ? window.app.user.email : 'טכנאי'
             };
             
-            const currentTimeline = app.currentTicket.timeline || [];
+            const currentTimeline = window.app.currentTicket.timeline || [];
             const updatedTimeline = [newEntry, ...currentTimeline];
             
-            await DB.update(app.currentTicket.id, { timeline: updatedTimeline });
-            app.currentTicket.timeline = updatedTimeline;
+            await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
+            window.app.currentTicket.timeline = updatedTimeline;
             form.reset();
-            app.renderTicketDetail(); // Re-render to show new entry
+            window.app.renderTicketDetail();
         },
 
         deleteTicket: async () => {
-            if (!app.currentTicket) return;
+            if (!window.app.currentTicket) return;
 
             const ok = confirm("האם למחוק את התיקון? פעולה זו לא ניתנת לשחזור.");
             if (!ok) return;
 
             try {
-                await DB.delete(app.currentTicket.id);
+                await DB.delete(window.app.currentTicket.id);
 
-                app.tickets = app.tickets.filter(t => t.id !== app.currentTicket.id);
-                app.currentTicket = null;
+                window.app.tickets = window.app.tickets.filter(t => t.id !== window.app.currentTicket.id);
+                window.app.currentTicket = null;
 
                 Utils.showToast("התיקון נמחק בהצלחה");
                 router.navigate('tickets');
-                app.renderTickets();
+                window.app.renderTickets();
             } catch (e) {
-                // שגיאה טופלה ב-DB
+                // error handled in DB
             }
         },
 
+        deleteBike: () => {
+            const id = document.getElementById('bike-form').querySelector('[name="id"]').value;
+            if (id && confirm('האם למחוק אופניים אלו מהמלאי?')) {
+                BikeDB.delete(id);
+                window.app.bikes = BikeDB.getAll();
+                window.app.renderBikes();
+                Utils.showToast('הפריט נמחק');
+                router.navigate('secondhand');
+            }
+        },
+
+        renderBikes: () => {
+            const search = document.getElementById('bike-search').value.toLowerCase();
+            const brandFilter = document.getElementById('bike-filter-brand').value;
+            const sizeFilter = document.getElementById('bike-filter-size').value;
+
+            const brands = [...new Set(window.app.bikes.map(b => b.brand))];
+            const sizes = [...new Set(window.app.bikes.map(b => b.size))];
+            
+            const filtered = window.app.bikes.filter(b => {
+                const matchSearch = (b.brand + b.model + b.sku).toLowerCase().includes(search);
+                const matchBrand = brandFilter === 'all' || b.brand === brandFilter;
+                const matchSize = sizeFilter === 'all' || b.size === sizeFilter;
+                return matchSearch && matchBrand && matchSize;
+            });
+
+            const brandSelect = document.getElementById('bike-filter-brand');
+            if (brandSelect && brandSelect.children.length === 1) {
+                brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
+            }
+            const sizeSelect = document.getElementById('bike-filter-size');
+             if (sizeSelect && sizeSelect.children.length === 1) {
+                sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            }
+
+            const tbody = document.getElementById('bikes-table-body');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">לא נמצאו אופניים</td></tr>`;
+            } else {
+                tbody.innerHTML = filtered.map(b => `
+                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openBikeDetail('${b.id}')">
+                        <td class="p-4 font-medium">${b.brand}</td>
+                        <td class="p-4">${b.model}</td>
+                        <td class="p-4 hidden md:table-cell text-gray-500">${b.color || '-'}</td>
+                        <td class="p-4">${b.size || '-'}</td>
+                        <td class="p-4 font-bold text-green-600">${Utils.formatCurrency(b.price)}</td>
+                        <td class="p-4"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-400"></i></td>
+                    </tr>
+                `).join('');
+                lucide.createIcons();
+            }
+        },
+
+        openBikeDetail: (id) => {
+            const bike = window.app.bikes.find(b => b.id === id);
+            if (!bike) return;
+            
+            const form = document.getElementById('bike-form');
+            form.reset();
+            
+            Object.keys(bike).forEach(key => {
+                const field = form.querySelector(`[name="${key}"]`);
+                if(field) field.value = bike[key];
+            });
+            form.querySelector('[name="id"]').value = bike.id;
+
+            document.getElementById('bike-form-title').innerText = `עריכת אופניים: ${bike.brand} ${bike.model}`;
+            document.getElementById('btn-delete-bike').classList.remove('hidden');
+            router.navigate('bike-detail');
+        },
+
+        openCreateBike: () => {
+            const form = document.getElementById('bike-form');
+            form.reset();
+            form.querySelector('[name="id"]').value = '';
+            document.getElementById('bike-form-title').innerText = 'כרטיס אופני יד שנייה - חדש';
+            document.getElementById('btn-delete-bike').classList.add('hidden');
+            router.navigate('bike-detail');
+        },
+
         renderTicketDetail: () => {
-            const ticket = app.currentTicket;
-            const customerHistory = app.tickets.filter(t => t.customerPhone === ticket.customerPhone && t.id !== ticket.id);
+            const ticket = window.app.currentTicket;
+            const customerHistory = window.app.tickets.filter(t => t.customerPhone === ticket.customerPhone && t.id !== ticket.id);
             const container = document.getElementById('view-ticket-detail');
             const timeline = ticket.timeline || [];
             
@@ -1380,8 +1427,8 @@
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-bold">הצעת מחיר</h3>
                     <div class="flex gap-2">
-                        <button onclick="app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button>
-                        <button onclick="app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
+                        <button onclick="window.app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button>
+                        <button onclick="window.app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
                     </div>
                 </div>
                 <div class="bg-white border rounded-lg overflow-hidden mb-6">
@@ -1398,7 +1445,7 @@
                         </thead>
                         <tbody id="quote-items-body"></tbody>
                         <tfoot class="bg-gray-50">
-                            <tr><td colspan="6" class="p-2 text-center"><button onclick="app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
+                            <tr><td colspan="6" class="p-2 text-center"><button onclick="window.app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
                         </tfoot>
                     </table>
                     <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
@@ -1411,7 +1458,7 @@
             const timelineContent = `
                  <div class="bg-white p-4 rounded-lg border mb-4">
                     <h4 class="font-bold mb-3">הוסף תיעוד חדש</h4>
-                    <form onsubmit="app.addTimelineEntry(event)" class="space-y-3">
+                    <form onsubmit="window.app.addTimelineEntry(event)" class="space-y-3">
                         <div class="flex gap-2">
                              <select name="action" class="border rounded p-2 text-sm w-1/3">
                                  <option>בדיקה ראשונית</option>
@@ -1450,7 +1497,7 @@
                 <div class="space-y-3 mt-4">
                     ${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}
                     ${customerHistory.map(t => `
-                        <div onclick="app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
+                        <div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span>
@@ -1459,7 +1506,7 @@
                                 <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
                             </div>
                             <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                ${app.getStatusBadge(t.status)}
+                                ${window.app.getStatusBadge(t.status)}
                                 <div class="text-xs text-gray-500 flex items-center gap-1">
                                     <i data-lucide="calendar" class="w-3"></i>
                                     ${Utils.formatDate(t.createdAt).split(',')[0]}
@@ -1470,9 +1517,8 @@
                 </div>
             `;
             
-            // Editable Inputs Logic
             const renderInput = (field, value, type="text") => {
-                if(app.isEditingDetails) {
+                if(window.app.isEditingDetails) {
                     return `<input data-field="${field}" value="${value || ''}" class="w-full border rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-200">`;
                 }
                 return `<div class="text-gray-800 font-medium">${value || '-'}</div>`;
@@ -1490,8 +1536,8 @@
                                 <div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div>
                             </div>
                             <div class="flex gap-2">
-                                <button onclick="app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}">
-                                    <i data-lucide="${app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i>
+                                <button onclick="window.app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${window.app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}">
+                                    <i data-lucide="${window.app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i>
                                 </button>
                                 <button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
                             </div>
@@ -1501,7 +1547,7 @@
                             <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
                             <div class="flex flex-wrap gap-2">
                                 ${Object.entries(STATUSES).map(([k, v]) => `
-                                    <button onclick="app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>
+                                    <button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>
                                 `).join('')}
                             </div>
                         </div>
@@ -1529,7 +1575,7 @@
                                     <div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div>
                                     <div>
                                         <span class="text-gray-400 text-xs">תקלה:</span>
-                                        ${app.isEditingDetails 
+                                        ${window.app.isEditingDetails 
                                             ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>`
                                             : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`
                                         }
@@ -1537,14 +1583,14 @@
                                 </div>
                             </div>
                             
-                            ${app.isEditingDetails ? `
-                                <button onclick="app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4">
+                            ${window.app.isEditingDetails ? `
+                                <button onclick="window.app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4">
                                     <i data-lucide="save" class="w-4"></i> שמור שינויים
                                 </button>
                             ` : ''}
 
                             <div class="mt-8 border-t pt-4">
-                                <button onclick="app.deleteTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">
+                                <button onclick="window.app.deleteTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i> מחק תיקון
                                 </button>
                             </div>
@@ -1554,13 +1600,13 @@
                     <div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden">
                         <!-- Tabs -->
                         <div class="flex border-b bg-gray-50">
-                            <button onclick="app.switchTicketTab('details')" class="tab-btn flex-1 ${app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר</button>
-                            <button onclick="app.switchTicketTab('timeline')" class="tab-btn flex-1 ${app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button>
-                            <button onclick="app.switchTicketTab('history')" class="tab-btn flex-1 ${app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button>
+                            <button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר</button>
+                            <button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button>
+                            <button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button>
                         </div>
                         <div class="p-6 overflow-y-auto h-full">
-                            ${app.activeTicketTab === 'details' ? detailsContent : 
-                              app.activeTicketTab === 'timeline' ? timelineContent : 
+                            ${window.app.activeTicketTab === 'details' ? detailsContent : 
+                              window.app.activeTicketTab === 'timeline' ? timelineContent : 
                               historyContent}
                         </div>
                     </div>
@@ -1568,8 +1614,8 @@
             `;
             
             lucide.createIcons();
-            if(app.activeTicketTab === 'details') {
-                app.renderQuoteItems();
+            if(window.app.activeTicketTab === 'details') {
+                window.app.renderQuoteItems();
             }
         },
 
@@ -1577,29 +1623,29 @@
             const tbody = document.getElementById('quote-items-body');
             if(!tbody) return; 
             
-            const items = app.currentTicket.quote.items || [];
+            const items = window.app.currentTicket.quote.items || [];
             
             tbody.innerHTML = items.map((item, idx) => `
                 <tr id="quote-row-${idx}">
                     <td class="p-2 text-center">
                         <input type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" 
                             ${item.completed ? 'checked' : ''} 
-                            onchange="app.toggleQuoteItemCompletion(${idx})">
+                            onchange="window.app.toggleQuoteItemCompletion(${idx})">
                     </td>
-                    <td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="app.updateQuoteItem(${idx}, 'description', this.value)"></td>
-                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="app.updateQuoteItem(${idx}, 'quantity', this.value)"></td>
-                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="app.updateQuoteItem(${idx}, 'price', this.value)"></td>
+                    <td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="window.app.updateQuoteItem(${idx}, 'description', this.value)"></td>
+                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="window.app.updateQuoteItem(${idx}, 'quantity', this.value)"></td>
+                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="window.app.updateQuoteItem(${idx}, 'price', this.value)"></td>
                     <td class="p-2 row-total">${Utils.formatCurrency(item.quantity * item.price)}</td>
-                    <td class="p-2 text-center"><button onclick="app.removeQuoteItem(${idx})" class="text-red-500"><i data-lucide="x" class="w-4"></i></button></td>
+                    <td class="p-2 text-center"><button onclick="window.app.removeQuoteItem(${idx})" class="text-red-500"><i data-lucide="x" class="w-4"></i></button></td>
                 </tr>
             `).join('');
             
-            app.updateQuoteTotal();
+            window.app.updateQuoteTotal();
             lucide.createIcons();
         },
 
         updateQuoteItem: (idx, field, val) => {
-            const item = app.currentTicket.quote.items[idx];
+            const item = window.app.currentTicket.quote.items[idx];
             item[field] = field === 'description' ? val : parseFloat(val) || 0;
             
             if (field !== 'description') {
@@ -1608,50 +1654,50 @@
                     row.querySelector('.row-total').innerText = Utils.formatCurrency(item.quantity * item.price);
                 }
             }
-            app.updateQuoteTotal();
+            window.app.updateQuoteTotal();
         },
 
         toggleQuoteItemCompletion: (idx) => {
-            const item = app.currentTicket.quote.items[idx];
+            const item = window.app.currentTicket.quote.items[idx];
             item.completed = !item.completed;
-            app.saveQuote();
+            window.app.saveQuote();
         },
 
         updateQuoteTotal: () => {
-             const items = app.currentTicket.quote.items;
+             const items = window.app.currentTicket.quote.items;
              const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
-             app.currentTicket.quote.total = total;
+             window.app.currentTicket.quote.total = total;
              const totalEl = document.getElementById('quote-total');
              if(totalEl) totalEl.innerText = Utils.formatCurrency(total);
         },
 
         addQuoteItem: () => {
-            if(!app.currentTicket.quote.items) app.currentTicket.quote.items = [];
-            app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false });
-            app.renderQuoteItems(); // כאן חייבים רינדור מלא
+            if(!window.app.currentTicket.quote.items) window.app.currentTicket.quote.items = [];
+            window.app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false });
+            window.app.renderQuoteItems(); 
         },
 
         removeQuoteItem: (idx) => {
-            app.currentTicket.quote.items.splice(idx, 1);
-            app.renderQuoteItems(); // כאן חייבים רינדור מלא
+            window.app.currentTicket.quote.items.splice(idx, 1);
+            window.app.renderQuoteItems();
         },
 
         saveQuote: async () => {
-            await DB.update(app.currentTicket.id, { quote: app.currentTicket.quote });
+            await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
             Utils.showToast('השינויים נשמרו');
         },
 
         updateStatus: async (newStatus) => {
-            app.currentTicket.status = newStatus;
-            await DB.update(app.currentTicket.id, { status: newStatus });
-            app.tickets = await DB.getAll(); // Refresh global list
-            app.renderTicketDetail(); 
+            window.app.currentTicket.status = newStatus;
+            await DB.update(window.app.currentTicket.id, { status: newStatus });
+            window.app.tickets = await DB.getAll(); // Refresh global list
+            window.app.renderTicketDetail(); 
             Utils.showToast('סטטוס עודכן');
         },
 
         // PDF Print
         printTicket: () => {
-            const ticket = app.currentTicket;
+            const ticket = window.app.currentTicket;
             const printWindow = window.open('', '_blank');
             
             // Calculate totals
@@ -1818,10 +1864,10 @@
                 else btn.classList.remove('bg-blue-50', 'text-blue-700');
             });
 
-            if(target === 'dashboard') app.renderDashboard();
-            if(target === 'tickets') app.renderTickets();
-            if(target === 'customers') app.renderCustomers();
-            if(target === 'secondhand') app.renderBikes();
+            if(target === 'dashboard') window.app.renderDashboard();
+            if(target === 'tickets') window.app.renderTickets();
+            if(target === 'customers') window.app.renderCustomers();
+            if(target === 'secondhand') window.app.renderBikes();
 
             closeMobileMenu();
         }
@@ -1829,7 +1875,7 @@
 
     // Init
     window.onload = () => {
-        app.init();
+        window.app.init();
     };
 
 </script>
