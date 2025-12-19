@@ -1094,12 +1094,14 @@
 
             // --- Pie Chart Rendering ---
             const chartCtx = document.getElementById('dashboard-pie-chart').getContext('2d');
+            
+            // Exclude 'completed' and 'cancelled' (optional, you said 'completed' must be out) 
+            // and filter out zeros
             const dataMap = [
                 { label: 'חדש', value: counts.new, color: STATUS_COLORS.new },
                 { label: 'ממתין לאישור', value: counts.waiting_approval, color: STATUS_COLORS.waiting_approval },
                 { label: 'בטיפול', value: counts.in_progress, color: STATUS_COLORS.in_progress },
-                { label: 'הושלם', value: counts.completed, color: STATUS_COLORS.completed },
-                { label: 'בוטל', value: counts.cancelled, color: STATUS_COLORS.cancelled },
+                // 'completed' removed from chart
                 { label: 'אופניים חדשים', value: counts.new_bike, color: STATUS_COLORS.new_bike },
                 { label: 'אופני מבחן', value: counts.test_bike, color: STATUS_COLORS.test_bike },
                 { label: 'יד שנייה', value: counts.second_hand, color: STATUS_COLORS.second_hand }
@@ -1120,6 +1122,29 @@
                     window.app.chartInstance.destroy();
                 }
                 
+                // Custom plugin to draw percentage on the chart segments
+                const percentagePlugin = {
+                    id: 'percentageLabels',
+                    afterDatasetsDraw(chart) {
+                        const { ctx, data } = chart;
+                        chart.data.datasets.forEach((dataset, i) => {
+                            const meta = chart.getDatasetMeta(i);
+                            meta.data.forEach((element, index) => {
+                                const value = dataset.data[index];
+                                const percent = Math.round((value / total) * 100);
+                                if (percent > 5) { // Only show if > 5% to avoid clutter
+                                    const { x, y } = element.tooltipPosition();
+                                    ctx.fillStyle = '#fff';
+                                    ctx.font = 'bold 11px Heebo';
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'middle';
+                                    ctx.fillText(`${percent}%`, x, y);
+                                }
+                            });
+                        });
+                    }
+                };
+
                 window.app.chartInstance = new Chart(chartCtx, {
                     type: 'doughnut',
                     data: {
@@ -1137,8 +1162,21 @@
                             legend: {
                                 position: 'right',
                                 labels: {
-                                    font: { family: 'Heebo' },
-                                    boxWidth: 12
+                                    font: { family: 'Heebo', size: 11 },
+                                    boxWidth: 10,
+                                    generateLabels: (chart) => {
+                                        const data = chart.data;
+                                        return data.labels.map((label, i) => {
+                                            const val = data.datasets[0].data[i];
+                                            const pct = Math.round((val / total) * 100);
+                                            return {
+                                                text: `${label} - ${val} (${pct}%)`,
+                                                fillStyle: data.datasets[0].backgroundColor[i],
+                                                hidden: false,
+                                                index: i
+                                            };
+                                        });
+                                    }
                                 }
                             },
                             tooltip: {
@@ -1151,7 +1189,8 @@
                                 }
                             }
                         }
-                    }
+                    },
+                    plugins: [percentagePlugin]
                 });
             }
 
