@@ -14,6 +14,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
+    <!-- Chart.js (Optional, kept for future use if needed) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
 
@@ -82,7 +85,7 @@
             background-color: #2563eb;
         }
 
-        /* Scrollbar styling for table container */
+        /* Scrollbar styling */
         .custom-scroll::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -151,6 +154,10 @@
                 <button onclick="router.navigate('secondhand')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="secondhand">
                     <i data-lucide="bike" class="w-5 h-5"></i> יד שנייה
                 </button>
+                <!-- Archive Link -->
+                <button onclick="router.navigate('archive')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="archive">
+                    <i data-lucide="archive" class="w-5 h-5"></i> ארכיון תיקונים
+                </button>
             </nav>
 
             <div class="p-4 border-t">
@@ -158,7 +165,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v7.4 (TagNumber Display)
+                    BikeCare v8.0 (Full)
                 </div>
             </div>
         </aside>
@@ -248,7 +255,7 @@
                             </h3>
                         </div>
                         
-                        <div class="overflow-auto custom-scroll flex-1 p-0">
+                        <div class="overflow-y-auto overflow-x-hidden custom-scroll flex-1 p-0 max-h-[60vh] md:max-h-none">
                             <table class="w-full text-right text-sm border-collapse">
                                 <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
                                     <tr>
@@ -446,6 +453,37 @@
                 <!-- Customer Detail View (New) -->
                 <div id="view-customer-detail" class="view-section h-full">
                     <!-- Content injected by JS -->
+                </div>
+                
+                <!-- Archive View -->
+                <div id="view-archive" class="view-section">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800">ארכיון תיקונים</h2>
+                    </div>
+    
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-4">
+                        <div class="relative w-full">
+                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="archive-search" placeholder="חיפוש בארכיון..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="window.app.renderArchive()">
+                        </div>
+                    </div>
+    
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="p-4">#</th>
+                                        <th class="p-4">לקוח</th>
+                                        <th class="p-4">דגם</th>
+                                        <th class="p-4">סטטוס אחרון</th>
+                                        <th class="p-4">תאריך יצירה</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archive-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Second Hand Bikes View (New) -->
@@ -699,19 +737,20 @@
                 localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
             }
         },
+        // Archive instead of delete
         delete: async (id) => {
-            const { error } = await sb
-                .from('tickets')
-                .delete()
-                .eq('id', id);
-
-            if (error) {
-                console.error("שגיאה במחיקת תיקון:", error);
-                Utils.showToast("שגיאה במחיקת התיקון", "error");
-                throw error;
-            }
-
-            localStorage.removeItem(`ticket_extras_${id}`);
+            // לא מוחקים פיזית אלא מעבירים לארכיון ע"י סימון דגל
+            // אם העמודה is_archived לא קיימת ב-DB, נשתמש ב-localStorage כגיבוי
+            const updates = { is_archived: true };
+            
+            // נסיון לעדכן ב-DB (אם העמודה קיימת)
+            const { error } = await sb.from('tickets').update(updates).eq('id', id);
+            
+            // אם נכשל (אולי אין עמודה), נשמור בלוקאל
+            // אבל בכל מקרה נסמן בלוקאל ליתר ביטחון עבור הממשק הנוכחי
+            const currentExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
+            currentExtras.is_archived = true;
+            localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(currentExtras));
         }
     };
 
@@ -827,6 +866,7 @@
                           const currentView = document.querySelector('.view-section.active').id;
                           if(currentView === 'view-dashboard') window.app.renderDashboard();
                           if(currentView === 'view-tickets') window.app.renderTickets();
+                          if(currentView === 'view-archive') window.app.renderArchive();
                     } else {
                         window.app.tickets = freshData;
                     }
@@ -946,6 +986,7 @@
         },
 
         getNextTicketNumber: () => {
+            // חישוב מכל הטיקטים (כולל ארכיון, כי הם ברשימה הראשית אבל מסומנים בדגל)
             const numbers = window.app.tickets.map(t => parseInt(t.ticketNumber) || 0);
             const max = numbers.length > 0 ? Math.max(...numbers) : 0;
             return Math.max(max + 1, 2400);
@@ -1004,7 +1045,9 @@
         },
         
         renderDashboard: () => {
-            const t = window.app.tickets;
+            // סינון ארכיון מהדשבורד
+            const t = window.app.tickets.filter(x => !x.is_archived);
+            
             const counts = {
                 new: t.filter(x => x.status === 'new').length,
                 new_bike: t.filter(x => x.status === 'new_bike').length,
@@ -1077,7 +1120,10 @@
             const filter = document.getElementById('tickets-filter').value;
             const priorityFilter = document.getElementById('priority-filter').value;
             
+            // סינון ארכיון מרשימת הטיקטים הרגילה
             let filtered = window.app.tickets.filter(t => {
+                if (t.is_archived) return false;
+                
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
                                     (t.ticketNumber || '').toString().includes(search) ||
                                     (t.bikeModel || '').toLowerCase().includes(search) ||
@@ -1136,6 +1182,36 @@
                     <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdAt)}</td>
                 </tr>
             `).join('');
+        },
+        
+        renderArchive: () => {
+            const searchInput = document.getElementById('archive-search');
+            const search = searchInput ? searchInput.value.toLowerCase() : '';
+            
+            // סינון: רק מה שבארכיון
+            let filtered = window.app.tickets.filter(t => {
+                const isArchived = t.is_archived === true;
+                const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
+                                    (t.ticketNumber || '').toString().includes(search) || 
+                                    (t.bikeModel || '').toLowerCase().includes(search);
+                return isArchived && matchSearch;
+            });
+
+            const tbody = document.getElementById('archive-table-body');
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">הארכיון ריק או לא נמצאו תוצאות</td></tr>`;
+            } else {
+                tbody.innerHTML = filtered.map(t => `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100 cursor-pointer text-gray-500" onclick="window.app.openTicket('${t.id}')">
+                        <td class="p-4 font-mono">#${t.ticketNumber}</td>
+                        <td class="p-4">${t.customerName}</td>
+                        <td class="p-4">${t.bikeModel}</td>
+                        <td class="p-4 text-xs">${window.app.getStatusBadge(t.status)}</td>
+                        <td class="p-4 text-sm">${Utils.formatDate(t.createdAt)}</td>
+                    </tr>
+                `).join('');
+            }
+            lucide.createIcons();
         },
 
         renderCustomers: () => {
@@ -1317,23 +1393,28 @@
             window.app.renderTicketDetail();
         },
 
-        deleteTicket: async () => {
+        archiveTicket: async () => {
             if (!window.app.currentTicket) return;
 
-            const ok = confirm("האם למחוק את התיקון? פעולה זו לא ניתנת לשחזור.");
+            const ok = confirm("האם אתה בטוח שברצונך להעביר את התיקון לארכיון?");
             if (!ok) return;
 
             try {
-                await DB.delete(window.app.currentTicket.id);
+                // עדכון שדה is_archived במקום מחיקה
+                await DB.update(window.app.currentTicket.id, { is_archived: true });
 
-                window.app.tickets = window.app.tickets.filter(t => t.id !== window.app.currentTicket.id);
+                // עדכון לוקאלי
+                const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
+                if (ticketIndex > -1) {
+                    window.app.tickets[ticketIndex].is_archived = true;
+                }
+
                 window.app.currentTicket = null;
-
-                Utils.showToast("התיקון נמחק בהצלחה");
+                Utils.showToast("התיקון הועבר לארכיון בהצלחה");
                 router.navigate('tickets');
-                window.app.renderTickets();
             } catch (e) {
-                // error handled in DB
+                console.error(e);
+                Utils.showToast("שגיאה בארכוב", "error");
             }
         },
 
@@ -1451,17 +1532,6 @@
                     <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
                         <span>סה״כ לתשלום:</span>
                         <span id="quote-total">0.00 ₪</span>
-                    </div>
-                </div>
-                <!-- Signature -->
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
-                    <div id="signature-area">
-                        ${ticket.quote.isSigned 
-                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="window.app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
-                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
-                               <button onclick="window.app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
-                        }
                     </div>
                 </div>
             `;
@@ -1601,8 +1671,8 @@
                             ` : ''}
 
                             <div class="mt-8 border-t pt-4">
-                                <button onclick="window.app.deleteTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i> מחק תיקון
+                                <button onclick="window.app.archiveTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors">
+                                    <i data-lucide="archive" class="w-4 h-4"></i> העבר לארכיון
                                 </button>
                             </div>
                         </div>
@@ -1627,7 +1697,6 @@
             lucide.createIcons();
             if(window.app.activeTicketTab === 'details') {
                 window.app.renderQuoteItems();
-                if(!ticket.quote.isSigned) window.app.initCanvas();
             }
         },
 
@@ -1705,63 +1774,6 @@
             window.app.tickets = await DB.getAll(); // Refresh global list
             window.app.renderTicketDetail(); 
             Utils.showToast('סטטוס עודכן');
-        },
-
-        // Canvas Logic
-        initCanvas: () => {
-            const canvas = document.getElementById('sig-canvas');
-            if(!canvas) return;
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            // Set styles for visibility
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.strokeStyle = '#000';
-            
-            let isDrawing = false;
-            
-            const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-                return {x, y};
-            }
-
-            const start = (e) => { isDrawing = true; ctx.beginPath(); const {x,y} = getPos(e); ctx.moveTo(x,y); };
-            const move = (e) => { 
-                if(!isDrawing) return; 
-                e.preventDefault(); 
-                const {x,y} = getPos(e); 
-                ctx.lineTo(x,y); 
-                ctx.stroke(); 
-            };
-            const end = () => { isDrawing = false; };
-
-            canvas.addEventListener('mousedown', start);
-            canvas.addEventListener('mousemove', move);
-            canvas.addEventListener('mouseup', end);
-            canvas.addEventListener('touchstart', start);
-            canvas.addEventListener('touchmove', move);
-            canvas.addEventListener('touchend', end);
-        },
-
-        saveSignature: () => {
-            const canvas = document.getElementById('sig-canvas');
-            const dataUrl = canvas.toDataURL();
-            window.app.currentTicket.quote.isSigned = true;
-            window.app.currentTicket.quote.signature = dataUrl;
-            window.app.currentTicket.quote.signedAt = new Date().toISOString();
-            window.app.saveQuote();
-            window.app.renderTicketDetail();
-        },
-
-        clearSignature: () => {
-            window.app.currentTicket.quote.isSigned = false;
-            window.app.currentTicket.quote.signature = null;
-            window.app.saveQuote();
-            window.app.renderTicketDetail();
         },
 
         // PDF Print
@@ -1872,13 +1884,7 @@
                         </div>
                     </div>
 
-                    ${ticket.quote.isSigned ? `
-                        <div class="signature-section">
-                            <img src="${ticket.quote.signature}" class="sig-img" alt="חתימה" />
-                            <div>חתימת לקוח</div>
-                            <div style="font-size: 12px; color: #666; margin-top: 5px;">נחתם בתאריך: ${Utils.formatDate(ticket.quote.signedAt)}</div>
-                        </div>
-                    ` : '<div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>'}
+                    <div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>
 
                     <div class="footer">
                         הופק על ידי מערכת BikeCare Workshop CRM
@@ -1943,6 +1949,7 @@
             if(target === 'tickets') window.app.renderTickets();
             if(target === 'customers') window.app.renderCustomers();
             if(target === 'secondhand') window.app.renderBikes();
+            if(target === 'archive') window.app.renderArchive();
 
             closeMobileMenu();
         }
