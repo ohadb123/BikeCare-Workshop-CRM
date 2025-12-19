@@ -14,7 +14,7 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Chart.js (Optional, kept for future use if needed) -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Google Fonts -->
@@ -111,6 +111,14 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Action Item Styling */
+        .action-item {
+            transition: background-color 0.2s;
+        }
+        .action-item:hover {
+            background-color: #f9fafb;
+        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
@@ -165,7 +173,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v8.0 (Full)
+                    BikeCare v8.1 (Full)
                 </div>
             </div>
         </aside>
@@ -247,37 +255,51 @@
                         </div>
                     </div>
 
-                    <!-- NEW: Actionable Table -->
-                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden md:h-[500px]">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
-                            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                <i data-lucide="alert-circle" class="text-red-500 w-5 h-5"></i> מה דורש טיפול עכשיו
-                            </h3>
-                        </div>
+                    <!-- Row for Actionable Table and Pie Chart -->
+                    <div class="flex flex-col md:flex-row gap-6 mb-6">
                         
-                        <div class="overflow-y-auto overflow-x-hidden custom-scroll flex-1 p-0 max-h-[60vh] md:max-h-none">
-                            <table class="w-full text-right text-sm border-collapse">
-                                <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
-                                    <tr>
-                                        <th class="p-3 border-b font-medium w-1/6">לקוח</th>
-                                        <th class="p-3 border-b font-medium w-1/6">דגם/תיאור</th>
-                                        <th class="p-3 border-b font-medium w-1/6">סטטוס</th>
-                                        <th class="p-3 border-b font-medium w-1/6">ימים מאז שינוי סטטוס</th>
-                                        <th class="p-3 border-b font-medium w-2/6">הנחיה</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="attention-table-body" class="divide-y divide-gray-100">
-                                    <!-- Populated by JS -->
-                                    <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>
-                                </tbody>
-                            </table>
+                        <!-- NEW: Actionable Table -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden md:h-[400px] flex-1">
+                            <div class="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <i data-lucide="alert-circle" class="text-red-500 w-5 h-5"></i> מה דורש טיפול עכשיו
+                                </h3>
+                            </div>
+                            
+                            <div class="overflow-auto custom-scroll flex-1 p-0">
+                                <table class="w-full text-right text-sm border-collapse">
+                                    <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
+                                        <tr>
+                                            <th class="p-3 border-b font-medium w-1/6">לקוח</th>
+                                            <th class="p-3 border-b font-medium w-1/6">דגם/תיאור</th>
+                                            <th class="p-3 border-b font-medium w-1/6">סטטוס</th>
+                                            <th class="p-3 border-b font-medium w-1/6">ימים מאז שינוי סטטוס</th>
+                                            <th class="p-3 border-b font-medium w-2/6">הנחיה</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="attention-table-body" class="divide-y divide-gray-100">
+                                        <!-- Populated by JS -->
+                                        <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="p-3 border-t bg-gray-50 text-center shrink-0">
+                                <button onclick="router.navigate('tickets')" class="text-blue-600 hover:underline text-sm font-medium">
+                                    הצג הכל
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div class="p-3 border-t bg-gray-50 text-center shrink-0">
-                            <button onclick="router.navigate('tickets')" class="text-blue-600 hover:underline text-sm font-medium">
-                                הצג הכל
-                            </button>
+
+                        <!-- Pie Chart Container -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:w-1/3 flex flex-col items-center justify-center md:h-[400px]">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4 w-full text-right">התפלגות נתונים</h3>
+                            <div class="w-full h-full flex items-center justify-center relative" style="max-height: 300px;">
+                                <canvas id="dashboard-pie-chart"></canvas>
+                                <div id="no-data-msg" class="absolute inset-0 flex items-center justify-center text-gray-500 hidden">אין נתונים להצגה</div>
+                            </div>
                         </div>
+
                     </div>
                 </div>
 
@@ -656,6 +678,19 @@
         }
     };
 
+    // --- Colors Map for Pie Chart ---
+    const STATUS_COLORS = {
+        new: '#3b82f6', // blue-500
+        in_progress: '#eab308', // yellow-500
+        waiting_approval: '#a855f7', // purple-500
+        completed: '#22c55e', // green-500
+        cancelled: '#6b7280', // gray-500
+        new_bike: '#14b8a6', // teal-500
+        test_bike: '#f97316', // orange-500
+        second_hand: '#6366f1', // indigo-500
+        archived: '#9ca3af' // gray-400
+    };
+
     // --- Actions/Statuses Map for Operational Dashboard ---
     const ACTION_TEXTS = {
         new: 'מומלץ ליצור קשר ראשוני לאיסוף פרטים ולהבנת הצורך.',
@@ -739,18 +774,7 @@
         },
         // Archive instead of delete
         delete: async (id) => {
-            // לא מוחקים פיזית אלא מעבירים לארכיון ע"י סימון דגל
-            // אם העמודה is_archived לא קיימת ב-DB, נשתמש ב-localStorage כגיבוי
-            const updates = { is_archived: true };
-            
-            // נסיון לעדכן ב-DB (אם העמודה קיימת)
-            const { error } = await sb.from('tickets').update(updates).eq('id', id);
-            
-            // אם נכשל (אולי אין עמודה), נשמור בלוקאל
-            // אבל בכל מקרה נסמן בלוקאל ליתר ביטחון עבור הממשק הנוכחי
-            const currentExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
-            currentExtras.is_archived = true;
-            localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(currentExtras));
+            // Deprecated: We use archive now. But keeping just in case.
         }
     };
 
@@ -792,6 +816,7 @@
         activeTicketTab: 'details',
         isEditingDetails: false,
         user: null,
+        chartInstance: null,
         
         // Flags
         started: false,
@@ -986,7 +1011,6 @@
         },
 
         getNextTicketNumber: () => {
-            // חישוב מכל הטיקטים (כולל ארכיון, כי הם ברשימה הראשית אבל מסומנים בדגל)
             const numbers = window.app.tickets.map(t => parseInt(t.ticketNumber) || 0);
             const max = numbers.length > 0 ? Math.max(...numbers) : 0;
             return Math.max(max + 1, 2400);
@@ -1045,8 +1069,8 @@
         },
         
         renderDashboard: () => {
-            // סינון ארכיון מהדשבורד
-            const t = window.app.tickets.filter(x => !x.is_archived);
+            // סינון ארכיון מהדשבורד (גם לפי דגל וגם לפי סטטוס)
+            const t = window.app.tickets.filter(x => !x.is_archived && x.status !== 'archived');
             
             const counts = {
                 new: t.filter(x => x.status === 'new').length,
@@ -1068,27 +1092,102 @@
             document.getElementById('stat-cancelled').innerText = counts.cancelled;
             document.getElementById('stat-second_hand').innerText = counts.second_hand;
 
+            // --- Pie Chart Rendering ---
+            const chartCtx = document.getElementById('dashboard-pie-chart').getContext('2d');
+            const dataMap = [
+                { label: 'חדש', value: counts.new, color: STATUS_COLORS.new },
+                { label: 'ממתין לאישור', value: counts.waiting_approval, color: STATUS_COLORS.waiting_approval },
+                { label: 'בטיפול', value: counts.in_progress, color: STATUS_COLORS.in_progress },
+                { label: 'הושלם', value: counts.completed, color: STATUS_COLORS.completed },
+                { label: 'בוטל', value: counts.cancelled, color: STATUS_COLORS.cancelled },
+                { label: 'אופניים חדשים', value: counts.new_bike, color: STATUS_COLORS.new_bike },
+                { label: 'אופני מבחן', value: counts.test_bike, color: STATUS_COLORS.test_bike },
+                { label: 'יד שנייה', value: counts.second_hand, color: STATUS_COLORS.second_hand }
+            ].filter(item => item.value > 0);
+
+            if (dataMap.length === 0) {
+                document.getElementById('no-data-msg').classList.remove('hidden');
+                if (window.app.chartInstance) {
+                    window.app.chartInstance.destroy();
+                    window.app.chartInstance = null;
+                }
+            } else {
+                document.getElementById('no-data-msg').classList.add('hidden');
+                
+                const total = dataMap.reduce((sum, item) => sum + item.value, 0);
+                
+                if (window.app.chartInstance) {
+                    window.app.chartInstance.destroy();
+                }
+                
+                window.app.chartInstance = new Chart(chartCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: dataMap.map(d => d.label),
+                        datasets: [{
+                            data: dataMap.map(d => d.value),
+                            backgroundColor: dataMap.map(d => d.color),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    font: { family: 'Heebo' },
+                                    boxWidth: 12
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const val = context.raw;
+                                        const pct = Math.round((val / total) * 100);
+                                        return ` ${context.label}: ${val} (${pct}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // --- "What requires attention now" Logic ---
             const attentionList = document.getElementById('attention-table-body');
+            
+            // Filter logic updated per request:
+            // 1. Exclude 'cancelled' AND 'completed'
+            // 2. For 'new', only show if diffDays >= 2
+            // 3. Sort by days elapsed descending
             const now = new Date();
             const urgentTickets = t
                 .map(ticket => {
+                    // Calculate days passed
                     const updated = new Date(ticket.updatedAt || ticket.createdAt);
                     const diffTime = Math.abs(now - updated);
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
                     return { ...ticket, diffDays };
                 })
                 .filter(ticket => {
+                    // Rule 1: Exclude completed and cancelled
                     if (ticket.status === 'cancelled' || ticket.status === 'completed') return false;
+                    
+                    // Rule 2: For 'new' status, show only if at least 2 days passed
                     if (ticket.status === 'new') {
                         return ticket.diffDays >= 2;
                     }
+                    
+                    // Show all other statuses (in_progress, waiting_approval, etc.) immediately
                     return true;
                 })
-                .sort((a, b) => b.diffDays - a.diffDays)
-                .slice(0, 10);
+                .sort((a, b) => b.diffDays - a.diffDays) // Descending days (most urgent first)
+                .slice(0, 10); // Top 10
                 
             if (urgentTickets.length === 0) {
-                attentionList.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>`;
+                attentionList.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">אין פריטים הדורשים טיפול כרגע.</td></tr>`;
             } else {
                 attentionList.innerHTML = urgentTickets.map(ticket => {
                     const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
@@ -1400,13 +1499,17 @@
             if (!ok) return;
 
             try {
-                // עדכון שדה is_archived במקום מחיקה
-                await DB.update(window.app.currentTicket.id, { is_archived: true });
+                // עדכון שדה is_archived ושינוי סטטוס ל'archived'
+                await DB.update(window.app.currentTicket.id, { 
+                    is_archived: true,
+                    status: 'archived' 
+                });
 
                 // עדכון לוקאלי
                 const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
                 if (ticketIndex > -1) {
                     window.app.tickets[ticketIndex].is_archived = true;
+                    window.app.tickets[ticketIndex].status = 'archived';
                 }
 
                 window.app.currentTicket = null;
@@ -1534,6 +1637,17 @@
                         <span id="quote-total">0.00 ₪</span>
                     </div>
                 </div>
+                <!-- Signature -->
+                <div class="border rounded-lg p-4 bg-gray-50">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
+                    <div id="signature-area">
+                        ${ticket.quote.isSigned 
+                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="window.app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
+                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
+                               <button onclick="window.app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
+                        }
+                    </div>
+                </div>
             `;
             
             const timelineContent = `
@@ -1627,9 +1741,16 @@
                         <div class="mb-6">
                             <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
                             <div class="flex flex-wrap gap-2">
-                                ${Object.entries(STATUSES).map(([k, v]) => `
+                                ${Object.entries(STATUSES)
+                                    .filter(([k]) => k !== 'archived') // הסתרת כפתור 'בארכיון'
+                                    .map(([k, v]) => `
                                     <button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>
                                 `).join('')}
+                                
+                                <!-- הצגת אינדיקציה בלבד אם התיקון כבר בארכיון -->
+                                ${ticket.status === 'archived' ? 
+                                    `<span class="px-3 py-1 text-xs rounded-full border bg-gray-200 text-gray-600 border-gray-300">בארכיון</span>` 
+                                : ''}
                             </div>
                         </div>
                         
@@ -1697,6 +1818,7 @@
             lucide.createIcons();
             if(window.app.activeTicketTab === 'details') {
                 window.app.renderQuoteItems();
+                if(!ticket.quote.isSigned) window.app.initCanvas();
             }
         },
 
@@ -1917,7 +2039,8 @@
         in_progress: { label: 'בטיפול', color: 'bg-yellow-100 text-yellow-800' },
         waiting_approval: { label: 'ממתין לאישור', color: 'bg-purple-100 text-purple-800' },
         completed: { label: 'הושלם', color: 'bg-green-100 text-green-800' },
-        cancelled: { label: 'בוטל', color: 'bg-gray-100 text-gray-800' }
+        cancelled: { label: 'בוטל', color: 'bg-gray-100 text-gray-800' },
+        archived: { label: 'בארכיון', color: 'bg-gray-200 text-gray-600' }
     };
     const PRIORITIES = {
         normal: { label: 'רגיל' },
