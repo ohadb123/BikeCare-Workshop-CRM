@@ -1449,15 +1449,68 @@
             lucide.createIcons();
         },
 
-        openTicket: (id) => {
+openTicket: (id) => {
             const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
+
+            // הבטחת קיום אובייקט quote למניעת קריסות בתיקונים ישנים
+            if (!ticket.quote) {
+                ticket.quote = { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false };
+            }
+
             window.app.currentTicket = ticket;
-            window.app.isEditingDetails = false; // Reset edit mode
-            window.app.activeTicketTab = 'details'; // Reset tab
+            window.app.isEditingDetails = false; 
+            window.app.activeTicketTab = 'details'; 
+            
+            // מעבר למסך קודם כל כדי לשפר תגובתיות
+            router.navigate('ticket-detail'); 
             window.app.renderTicketDetail(); 
-            router.navigate('ticket-detail'); // Then switch view
         },
+
+initCanvas: () => {
+            const canvas = document.getElementById('sig-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let drawing = false;
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                return { x: clientX - rect.left, y: clientY - rect.top };
+            };
+
+            const start = (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); e.preventDefault(); };
+            const move = (e) => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
+            const stop = () => drawing = false;
+
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', stop);
+            canvas.addEventListener('touchstart', start, {passive: false});
+            canvas.addEventListener('touchmove', move, {passive: false});
+            canvas.addEventListener('touchend', stop);
+        },
+
+        saveSignature: async () => {
+            const canvas = document.getElementById('sig-canvas');
+            if (canvas) {
+                window.app.currentTicket.quote.isSigned = true;
+                window.app.currentTicket.quote.signedAt = new Date().toISOString();
+                window.app.currentTicket.quote.signature = canvas.toDataURL();
+                await window.app.saveQuote();
+                window.app.renderTicketDetail();
+            }
+        },
+
+        clearSignature: () => {
+            window.app.currentTicket.quote.isSigned = false;
+            window.app.currentTicket.quote.signature = null;
+            window.app.saveQuote();
+            window.app.renderTicketDetail();
+        },
+
+
 
         switchTicketTab: (tabName) => {
             window.app.activeTicketTab = tabName;
