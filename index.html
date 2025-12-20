@@ -165,7 +165,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v9.0 (Archive Fix)
+                    BikeCare v9.1 (Fixed Open Ticket)
                 </div>
             </div>
         </aside>
@@ -1255,7 +1255,7 @@
                 if (t.is_archived) return false;
                 
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
-                                    (t.ticketNumber || '').toString().includes(search) ||
+                                    (t.ticketNumber || '').toString().includes(search) || 
                                     (t.bikeModel || '').toLowerCase().includes(search) ||
                                     (t.tagNumber || '').toString().includes(search);
                 const matchFilter = filter === 'all' || t.status === filter;
@@ -1453,10 +1453,10 @@
             const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
             window.app.currentTicket = ticket;
-            window.app.isEditingDetails = false;
-            window.app.activeTicketTab = 'details';
-            window.app.renderTicketDetail();
-            router.navigate('ticket-detail');
+            window.app.isEditingDetails = false; // Reset edit mode
+            window.app.activeTicketTab = 'details'; // Reset tab
+            window.app.renderTicketDetail(); 
+            router.navigate('ticket-detail'); // Then switch view
         },
 
         switchTicketTab: (tabName) => {
@@ -1530,11 +1530,13 @@
             if (!ok) return;
 
             try {
+                // עדכון שדה is_archived ושינוי סטטוס ל'archived'
                 await DB.update(window.app.currentTicket.id, { 
                     is_archived: true,
                     status: 'archived' 
                 });
 
+                // עדכון לוקאלי
                 const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
                 if (ticketIndex > -1) {
                     window.app.tickets[ticketIndex].is_archived = true;
@@ -1756,6 +1758,7 @@
                                 <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
                                     תיקון #
                                     ${ticket.ticketNumber}
+                                    ${ticket.tagNumber ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full border border-yellow-200">תג: ${ticket.tagNumber}</span>` : ''}
                                 </h2>
                                 <div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div>
                             </div>
@@ -1830,7 +1833,7 @@
                     <div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden">
                         <!-- Tabs -->
                         <div class="flex border-b bg-gray-50">
-                            <button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר</button>
+                            <button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button>
                             <button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button>
                             <button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button>
                         </div>
