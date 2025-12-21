@@ -85,7 +85,7 @@
             background-color: #2563eb;
         }
 
-        /* Scrollbar styling */
+        /* Scrollbar styling for table container */
         .custom-scroll::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -165,7 +165,7 @@
                     <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
                 </button>
                 <div class="text-xs text-gray-400 text-center mt-2">
-                    BikeCare v9.1 (Fixed Open Ticket)
+                    BikeCare v9.2 (Selectable Archive Status)
                 </div>
             </div>
         </aside>
@@ -250,7 +250,7 @@
                     <!-- Row for Actionable Table and Pie Chart -->
                     <div class="flex flex-col md:flex-row gap-6 mb-6">
                         
-                        <!-- NEW: Actionable Table -->
+                        <!-- Actionable Table -->
                         <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden md:h-[400px] flex-1">
                             <div class="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
                                 <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -500,7 +500,7 @@
                     </div>
                 </div>
 
-                <!-- Second Hand Bikes View (New) -->
+                <!-- Second Hand Bikes View -->
                 <div id="view-secondhand" class="view-section">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">ניהול מלאי אופני יד שנייה</h2>
@@ -543,7 +543,7 @@
                     </div>
                 </div>
 
-                <!-- Bike Detail/Edit View (New) -->
+                <!-- Bike Detail/Edit View -->
                 <div id="view-bike-detail" class="view-section">
                      <div class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-lg">
                         <div class="flex justify-between items-center mb-6 border-b pb-4">
@@ -691,7 +691,8 @@
         completed: 'מומלץ לתאם מועד מסירה או איסוף עם הלקוח.',
         cancelled: 'אין פעולה נדרשת – ניתן להעביר לארכיון במידת הצורך.',
         new_bike: 'יש לעדכן היכן עומד תהליך הבנייה ולהעביר מידע בהתאם.',
-        test_bike: 'מומלץ ליצור קשר לקבלת משוב ולתאם את המשך התהליך.'
+        test_bike: 'מומלץ ליצור קשר לקבלת משוב ולתאם את המשך התהליך.',
+        archived: 'התיקון נמצא בארכיון.'
     };
 
     // --- Database (Supabase Cloud + Local Fallback for New Columns) ---
@@ -755,18 +756,17 @@
                 if (error) console.error("Update Error:", error);
             }
             
-            if (history || timeline || tagNumber !== undefined) {
+            if (history || timeline || tagNumber !== undefined || updates.is_archived !== undefined) {
                 const currentExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
-                const newExtras = { ...currentExtras };
+                const newExtras = { ...currentExtras, ...updates };
                 if(history) newExtras.history = history;
                 if(timeline) newExtras.timeline = timeline;
                 if(tagNumber !== undefined) newExtras.tagNumber = tagNumber;
                 localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
             }
         },
-        // Archive instead of delete
         delete: async (id) => {
-            // Deprecated: We use archive now. But keeping just in case.
+            // Deprecated: We use archive now.
         }
     };
 
@@ -1087,13 +1087,10 @@
             // --- Pie Chart Rendering ---
             const chartCtx = document.getElementById('dashboard-pie-chart').getContext('2d');
             
-            // Exclude 'completed' and 'cancelled' (optional, you said 'completed' must be out) 
-            // and filter out zeros
             const dataMap = [
                 { label: 'חדש', value: counts.new, color: STATUS_COLORS.new },
                 { label: 'ממתין לאישור', value: counts.waiting_approval, color: STATUS_COLORS.waiting_approval },
                 { label: 'בטיפול', value: counts.in_progress, color: STATUS_COLORS.in_progress },
-                // 'completed' removed from chart
                 { label: 'אופניים חדשים', value: counts.new_bike, color: STATUS_COLORS.new_bike },
                 { label: 'אופני מבחן', value: counts.test_bike, color: STATUS_COLORS.test_bike },
                 { label: 'יד שנייה', value: counts.second_hand, color: STATUS_COLORS.second_hand }
@@ -1107,24 +1104,20 @@
                 }
             } else {
                 document.getElementById('no-data-msg').classList.add('hidden');
-                
                 const total = dataMap.reduce((sum, item) => sum + item.value, 0);
                 
-                if (window.app.chartInstance) {
-                    window.app.chartInstance.destroy();
-                }
+                if (window.app.chartInstance) window.app.chartInstance.destroy();
                 
-                // Custom plugin to draw percentage on the chart segments
                 const percentagePlugin = {
                     id: 'percentageLabels',
                     afterDatasetsDraw(chart) {
-                        const { ctx, data } = chart;
+                        const { ctx } = chart;
                         chart.data.datasets.forEach((dataset, i) => {
                             const meta = chart.getDatasetMeta(i);
                             meta.data.forEach((element, index) => {
                                 const value = dataset.data[index];
                                 const percent = Math.round((value / total) * 100);
-                                if (percent > 5) { // Only show if > 5% to avoid clutter
+                                if (percent > 5) {
                                     const { x, y } = element.tooltipPosition();
                                     ctx.fillStyle = '#fff';
                                     ctx.font = 'bold 11px Heebo';
@@ -1173,7 +1166,7 @@
                             },
                             tooltip: {
                                 callbacks: {
-                                    label: function(context) {
+                                    label: (context) => {
                                         const val = context.raw;
                                         const pct = Math.round((val / total) * 100);
                                         return ` ${context.label}: ${val} (${pct}%)`;
@@ -1186,36 +1179,22 @@
                 });
             }
 
-            // --- "What requires attention now" Logic ---
             const attentionList = document.getElementById('attention-table-body');
-            
-            // Filter logic updated per request:
-            // 1. Exclude 'cancelled' AND 'completed'
-            // 2. For 'new', only show if diffDays >= 2
-            // 3. Sort by days elapsed descending
             const now = new Date();
             const urgentTickets = t
                 .map(ticket => {
-                    // Calculate days passed
                     const updated = new Date(ticket.updatedAt || ticket.createdAt);
                     const diffTime = Math.abs(now - updated);
                     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
                     return { ...ticket, diffDays };
                 })
                 .filter(ticket => {
-                    // Rule 1: Exclude completed and cancelled
                     if (ticket.status === 'cancelled' || ticket.status === 'completed') return false;
-                    
-                    // Rule 2: For 'new' status, show only if at least 2 days passed
-                    if (ticket.status === 'new') {
-                        return ticket.diffDays >= 2;
-                    }
-                    
-                    // Show all other statuses (in_progress, waiting_approval, etc.) immediately
+                    if (ticket.status === 'new') return ticket.diffDays >= 2;
                     return true;
                 })
-                .sort((a, b) => b.diffDays - a.diffDays) // Descending days (most urgent first)
-                .slice(0, 10); // Top 10
+                .sort((a, b) => b.diffDays - a.diffDays)
+                .slice(0, 10);
                 
             if (urgentTickets.length === 0) {
                 attentionList.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">אין פריטים הדורשים טיפול כרגע.</td></tr>`;
@@ -1223,7 +1202,6 @@
                 attentionList.innerHTML = urgentTickets.map(ticket => {
                     const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
                     const dayColorClass = window.app.getDaysColor(ticket.diffDays);
-                    
                     return `
                     <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="window.app.openTicket('${ticket.id}')">
                         <td class="p-3 text-gray-800 font-medium">${ticket.customerName}</td>
@@ -1245,15 +1223,12 @@
         renderTickets: () => {
             const searchInput = document.getElementById('tickets-search');
             if (!searchInput) return;
-            
             const search = searchInput.value.toLowerCase();
             const filter = document.getElementById('tickets-filter').value;
             const priorityFilter = document.getElementById('priority-filter').value;
             
-            // סינון ארכיון מרשימת הטיקטים הרגילה
             let filtered = window.app.tickets.filter(t => {
                 if (t.is_archived) return false;
-                
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
                                     (t.ticketNumber || '').toString().includes(search) || 
                                     (t.bikeModel || '').toLowerCase().includes(search) ||
@@ -1265,20 +1240,10 @@
 
             const { field, dir } = window.app.sortState;
             filtered.sort((a, b) => {
-                let valA = a[field];
-                let valB = b[field];
-
-                if (field === 'priority') {
-                    valA = window.app.getPriorityValue(valA);
-                    valB = window.app.getPriorityValue(valB);
-                } else if (field === 'createdAt') {
-                    valA = new Date(valA);
-                    valB = new Date(valB);
-                } else if (typeof valA === 'string') {
-                    valA = valA.toLowerCase();
-                    valB = valB.toLowerCase();
-                }
-
+                let valA = a[field], valB = b[field];
+                if (field === 'priority') { valA = window.app.getPriorityValue(valA); valB = window.app.getPriorityValue(valB); }
+                else if (field === 'createdAt') { valA = new Date(valA); valB = new Date(valB); }
+                else if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
                 if (valA < valB) return dir === 'asc' ? -1 : 1;
                 if (valA > valB) return dir === 'asc' ? 1 : -1;
                 return 0;
@@ -1317,8 +1282,6 @@
         renderArchive: () => {
             const searchInput = document.getElementById('archive-search');
             const search = searchInput ? searchInput.value.toLowerCase() : '';
-            
-            // סינון: רק מה שבארכיון
             let filtered = window.app.tickets.filter(t => {
                 const isArchived = t.is_archived === true;
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
@@ -1348,16 +1311,12 @@
             const searchInput = document.getElementById('customers-search');
             const search = searchInput ? searchInput.value.toLowerCase() : '';
             const custMap = new Map();
-            
             window.app.tickets.forEach(t => {
                 if(!t.customerPhone) return;
                 if(!custMap.has(t.customerPhone)) {
                     custMap.set(t.customerPhone, { 
-                        name: t.customerName, 
-                        phone: t.customerPhone, 
-                        email: t.customerEmail, 
-                        count: 0, 
-                        last: t.createdAt 
+                        name: t.customerName, phone: t.customerPhone, 
+                        email: t.customerEmail, count: 0, last: t.createdAt 
                     });
                 }
                 const c = custMap.get(t.customerPhone);
@@ -1387,12 +1346,7 @@
             const tickets = window.app.tickets.filter(t => t.customerPhone === phone).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
             if(tickets.length === 0) return;
             const latest = tickets[0];
-            
-            const customer = {
-                name: latest.customerName,
-                phone: latest.customerPhone,
-                email: latest.customerEmail
-            };
+            const customer = { name: latest.customerName, phone: latest.customerPhone, email: latest.customerEmail };
             window.app.currentCustomer = customer;
 
             const container = document.getElementById('view-customer-detail');
@@ -1413,29 +1367,18 @@
                             <i data-lucide="x"></i>
                         </button>
                      </div>
-                     
                      <div class="p-6 flex-1 overflow-y-auto bg-gray-50/50">
-                        <div class="flex items-center gap-2 mb-4">
-                            <i data-lucide="file-text" class="w-5 text-gray-500"></i>
-                            <h3 class="text-lg font-bold text-gray-700">היסטוריית תיקונים (${tickets.length})</h3>
-                        </div>
-                        
+                        <div class="flex items-center gap-2 mb-4"><i data-lucide="file-text" class="w-5 text-gray-500"></i><h3 class="text-lg font-bold text-gray-700">היסטוריית תיקונים (${tickets.length})</h3></div>
                         <div class="space-y-3">
                             ${tickets.map(t => `
                                 <div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
                                     <div class="flex-1">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span>
-                                            <span class="font-medium text-gray-800">${t.bikeModel}</span>
-                                        </div>
+                                        <div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span><span class="font-medium text-gray-800">${t.bikeModel}</span></div>
                                         <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
                                     </div>
                                     <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                                         ${window.app.getStatusBadge(t.status)}
-                                        <div class="text-xs text-gray-500 flex items-center gap-1">
-                                            <i data-lucide="calendar" class="w-3"></i>
-                                            ${Utils.formatDate(t.createdAt).split(',')[0]}
-                                        </div>
+                                        <div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div>
                                         <i data-lucide="chevron-left" class="w-4 text-gray-300"></i>
                                     </div>
                                 </div>
@@ -1444,46 +1387,35 @@
                      </div>
                 </div>
             `;
-            
             router.navigate('customer-detail');
             lucide.createIcons();
         },
 
-openTicket: (id) => {
+        openTicket: (id) => {
             const ticket = window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
-
-            // הבטחת קיום אובייקט quote למניעת קריסות בתיקונים ישנים
-            if (!ticket.quote) {
-                ticket.quote = { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false };
-            }
-
+            if (!ticket.quote) ticket.quote = { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false };
             window.app.currentTicket = ticket;
             window.app.isEditingDetails = false; 
             window.app.activeTicketTab = 'details'; 
-            
-            // מעבר למסך קודם כל כדי לשפר תגובתיות
             router.navigate('ticket-detail'); 
             window.app.renderTicketDetail(); 
         },
 
-initCanvas: () => {
+        initCanvas: () => {
             const canvas = document.getElementById('sig-canvas');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             let drawing = false;
-
             const getPos = (e) => {
                 const rect = canvas.getBoundingClientRect();
                 const clientX = e.clientX || (e.touches && e.touches[0].clientX);
                 const clientY = e.clientY || (e.touches && e.touches[0].clientY);
                 return { x: clientX - rect.left, y: clientY - rect.top };
             };
-
             const start = (e) => { drawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); e.preventDefault(); };
             const move = (e) => { if (!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
             const stop = () => drawing = false;
-
             canvas.addEventListener('mousedown', start);
             canvas.addEventListener('mousemove', move);
             window.addEventListener('mouseup', stop);
@@ -1510,42 +1442,20 @@ initCanvas: () => {
             window.app.renderTicketDetail();
         },
 
-
-
-        switchTicketTab: (tabName) => {
-            window.app.activeTicketTab = tabName;
-            window.app.renderTicketDetail();
-        },
-        
-        toggleEditDetails: () => {
-            window.app.isEditingDetails = !window.app.isEditingDetails;
-            window.app.renderTicketDetail();
-        },
+        switchTicketTab: (tabName) => { window.app.activeTicketTab = tabName; window.app.renderTicketDetail(); },
+        toggleEditDetails: () => { window.app.isEditingDetails = !window.app.isEditingDetails; window.app.renderTicketDetail(); },
         
         saveTicketDetails: async () => {
              const container = document.getElementById('view-ticket-detail');
-             const name = container.querySelector('[data-field="customerName"]').value;
-             const phone = container.querySelector('[data-field="customerPhone"]').value;
-             const email = container.querySelector('[data-field="customerEmail"]').value;
-             const bike = container.querySelector('[data-field="bikeModel"]').value;
-             const issue = container.querySelector('[data-field="issueDescription"]').value;
-             const tagNum = container.querySelector('[data-field="tagNumber"]').value;
-             
              const updates = {
-                 customerName: name,
-                 customerPhone: phone,
-                 customerEmail: email,
-                 bikeModel: bike,
-                 issueDescription: issue,
-                 tagNumber: tagNum
+                 customerName: container.querySelector('[data-field="customerName"]').value,
+                 customerPhone: container.querySelector('[data-field="customerPhone"]').value,
+                 customerEmail: container.querySelector('[data-field="customerEmail"]').value,
+                 bikeModel: container.querySelector('[data-field="bikeModel"]').value,
+                 issueDescription: container.querySelector('[data-field="issueDescription"]').value,
+                 tagNumber: container.querySelector('[data-field="tagNumber"]').value
              };
-             
-             const newHistory = [...(window.app.currentTicket.history || []), {
-                 date: new Date().toISOString(),
-                 action: 'פרטים עודכנו',
-                 user: window.app.user ? window.app.user.email : 'צוות'
-             }];
-             
+             const newHistory = [...(window.app.currentTicket.history || []), { date: new Date().toISOString(), action: 'פרטים עודכנו', user: window.app.user ? window.app.user.email : 'צוות' }];
              await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
              window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
              window.app.isEditingDetails = false;
@@ -1556,20 +1466,8 @@ initCanvas: () => {
         addTimelineEntry: async (e) => {
             e.preventDefault();
             const form = e.target;
-            const action = form.action.value;
-            const notes = form.notes.value;
-            
-            const newEntry = {
-                id: crypto.randomUUID(),
-                date: new Date().toISOString(),
-                action,
-                notes,
-                user: window.app.user ? window.app.user.email : 'טכנאי'
-            };
-            
-            const currentTimeline = window.app.currentTicket.timeline || [];
-            const updatedTimeline = [newEntry, ...currentTimeline];
-            
+            const newEntry = { id: crypto.randomUUID(), date: new Date().toISOString(), action: form.action.value, notes: form.notes.value, user: window.app.user ? window.app.user.email : 'טכנאי' };
+            const updatedTimeline = [newEntry, ...(window.app.currentTicket.timeline || [])];
             await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
             window.app.currentTicket.timeline = updatedTimeline;
             form.reset();
@@ -1577,42 +1475,22 @@ initCanvas: () => {
         },
 
         archiveTicket: async () => {
-            if (!window.app.currentTicket) return;
-
-            const ok = confirm("האם אתה בטוח שברצונך להעביר את התיקון לארכיון?");
-            if (!ok) return;
-
+            if (!window.app.currentTicket || !confirm("האם אתה בטוח שברצונך להעביר את התיקון לארכיון?")) return;
             try {
-                // עדכון שדה is_archived ושינוי סטטוס ל'archived'
-                await DB.update(window.app.currentTicket.id, { 
-                    is_archived: true,
-                    status: 'archived' 
-                });
-
-                // עדכון לוקאלי
+                await DB.update(window.app.currentTicket.id, { is_archived: true, status: 'archived' });
                 const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
-                if (ticketIndex > -1) {
-                    window.app.tickets[ticketIndex].is_archived = true;
-                    window.app.tickets[ticketIndex].status = 'archived';
-                }
-
+                if (ticketIndex > -1) { window.app.tickets[ticketIndex].is_archived = true; window.app.tickets[ticketIndex].status = 'archived'; }
                 window.app.currentTicket = null;
                 Utils.showToast("התיקון הועבר לארכיון בהצלחה");
                 router.navigate('tickets');
-            } catch (e) {
-                console.error(e);
-                Utils.showToast("שגיאה בארכוב", "error");
-            }
+            } catch (e) { Utils.showToast("שגיאה בארכוב", "error"); }
         },
 
         deleteBike: () => {
             const id = document.getElementById('bike-form').querySelector('[name="id"]').value;
             if (id && confirm('האם למחוק אופניים אלו מהמלאי?')) {
-                BikeDB.delete(id);
-                window.app.bikes = BikeDB.getAll();
-                window.app.renderBikes();
-                Utils.showToast('הפריט נמחק');
-                router.navigate('secondhand');
+                BikeDB.delete(id); window.app.bikes = BikeDB.getAll(); window.app.renderBikes();
+                Utils.showToast('הפריט נמחק'); router.navigate('secondhand');
             }
         },
 
@@ -1620,69 +1498,33 @@ initCanvas: () => {
             const search = document.getElementById('bike-search').value.toLowerCase();
             const brandFilter = document.getElementById('bike-filter-brand').value;
             const sizeFilter = document.getElementById('bike-filter-size').value;
-
-            const brands = [...new Set(window.app.bikes.map(b => b.brand))];
-            const sizes = [...new Set(window.app.bikes.map(b => b.size))];
-            
             const filtered = window.app.bikes.filter(b => {
-                const matchSearch = (b.brand + b.model + b.sku).toLowerCase().includes(search);
-                const matchBrand = brandFilter === 'all' || b.brand === brandFilter;
-                const matchSize = sizeFilter === 'all' || b.size === sizeFilter;
-                return matchSearch && matchBrand && matchSize;
+                return (b.brand + b.model + b.sku).toLowerCase().includes(search) && (brandFilter === 'all' || b.brand === brandFilter) && (sizeFilter === 'all' || b.size === sizeFilter);
             });
-
-            const brandSelect = document.getElementById('bike-filter-brand');
-            if (brandSelect && brandSelect.children.length === 1) {
-                brands.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
-            }
-            const sizeSelect = document.getElementById('bike-filter-size');
-             if (sizeSelect && sizeSelect.children.length === 1) {
-                sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
-            }
-
+            const brandSelect = document.getElementById('bike-filter-brand'), sizeSelect = document.getElementById('bike-filter-size');
+            if (brandSelect && brandSelect.children.length === 1) [...new Set(window.app.bikes.map(b => b.brand))].forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
+            if (sizeSelect && sizeSelect.children.length === 1) [...new Set(window.app.bikes.map(b => b.size))].forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
             const tbody = document.getElementById('bikes-table-body');
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">לא נמצאו אופניים</td></tr>`;
-            } else {
-                tbody.innerHTML = filtered.map(b => `
-                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openBikeDetail('${b.id}')">
-                        <td class="p-4 font-medium">${b.brand}</td>
-                        <td class="p-4">${b.model}</td>
-                        <td class="p-4 hidden md:table-cell text-gray-500">${b.color || '-'}</td>
-                        <td class="p-4">${b.size || '-'}</td>
-                        <td class="p-4 font-bold text-green-600">${Utils.formatCurrency(b.price)}</td>
-                        <td class="p-4"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-400"></i></td>
-                    </tr>
-                `).join('');
+            if (filtered.length === 0) tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-gray-500">לא נמצאו אופניים</td></tr>`;
+            else {
+                tbody.innerHTML = filtered.map(b => `<tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openBikeDetail('${b.id}')"><td class="p-4 font-medium">${b.brand}</td><td class="p-4">${b.model}</td><td class="p-4 hidden md:table-cell text-gray-500">${b.color || '-'}</td><td class="p-4">${b.size || '-'}</td><td class="p-4 font-bold text-green-600">${Utils.formatCurrency(b.price)}</td><td class="p-4"><i data-lucide="chevron-left" class="w-4 h-4 text-gray-400"></i></td></tr>`).join('');
                 lucide.createIcons();
             }
         },
 
         openBikeDetail: (id) => {
-            const bike = window.app.bikes.find(b => b.id === id);
-            if (!bike) return;
-            
-            const form = document.getElementById('bike-form');
-            form.reset();
-            
-            Object.keys(bike).forEach(key => {
-                const field = form.querySelector(`[name="${key}"]`);
-                if(field) field.value = bike[key];
-            });
+            const bike = window.app.bikes.find(b => b.id === id); if (!bike) return;
+            const form = document.getElementById('bike-form'); form.reset();
+            Object.keys(bike).forEach(key => { const field = form.querySelector(`[name="${key}"]`); if(field) field.value = bike[key]; });
             form.querySelector('[name="id"]').value = bike.id;
-
             document.getElementById('bike-form-title').innerText = `עריכת אופניים: ${bike.brand} ${bike.model}`;
-            document.getElementById('btn-delete-bike').classList.remove('hidden');
-            router.navigate('bike-detail');
+            document.getElementById('btn-delete-bike').classList.remove('hidden'); router.navigate('bike-detail');
         },
 
         openCreateBike: () => {
-            const form = document.getElementById('bike-form');
-            form.reset();
-            form.querySelector('[name="id"]').value = '';
+            const form = document.getElementById('bike-form'); form.reset(); form.querySelector('[name="id"]').value = '';
             document.getElementById('bike-form-title').innerText = 'כרטיס אופני יד שנייה - חדש';
-            document.getElementById('btn-delete-bike').classList.add('hidden');
-            router.navigate('bike-detail');
+            document.getElementById('btn-delete-bike').classList.add('hidden'); router.navigate('bike-detail');
         },
 
         renderTicketDetail: () => {
@@ -1690,428 +1532,58 @@ initCanvas: () => {
             const customerHistory = window.app.tickets.filter(t => t.customerPhone === ticket.customerPhone && t.id !== ticket.id);
             const container = document.getElementById('view-ticket-detail');
             const timeline = ticket.timeline || [];
-            
-            const detailsContent = `
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold">הצעת מחיר</h3>
-                    <div class="flex gap-2">
-                        <button onclick="window.app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button>
-                        <button onclick="window.app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button>
-                    </div>
-                </div>
-                <div class="bg-white border rounded-lg overflow-hidden mb-6">
-                    <table class="w-full text-right text-sm" id="quote-table">
-                        <thead class="bg-gray-50 border-b">
-                            <tr>
-                                <th class="p-3 w-10 text-center">בוצע</th>
-                                <th class="p-3">תיאור</th>
-                                <th class="p-3 w-20">כמות</th>
-                                <th class="p-3 w-24">מחיר</th>
-                                <th class="p-3 w-24">סה״כ</th>
-                                <th class="p-3 w-10"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="quote-items-body"></tbody>
-                        <tfoot class="bg-gray-50">
-                            <tr><td colspan="6" class="p-2 text-center"><button onclick="window.app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr>
-                        </tfoot>
-                    </table>
-                    <div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg">
-                        <span>סה״כ לתשלום:</span>
-                        <span id="quote-total">0.00 ₪</span>
-                    </div>
-                </div>
-                <!-- Signature -->
-                <div class="border rounded-lg p-4 bg-gray-50">
-                    <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4>
-                    <div id="signature-area">
-                        ${ticket.quote.isSigned 
-                            ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="window.app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>`
-                            : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas>
-                               <button onclick="window.app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`
-                        }
-                    </div>
-                </div>
-            `;
-            
-            const timelineContent = `
-                 <div class="bg-white p-4 rounded-lg border mb-4">
-                    <h4 class="font-bold mb-3">הוסף תיעוד חדש</h4>
-                    <form onsubmit="window.app.addTimelineEntry(event)" class="space-y-3">
-                        <div class="flex gap-2">
-                             <select name="action" class="border rounded p-2 text-sm w-1/3">
-                                 <option>בדיקה ראשונית</option>
-                                 <option>המתנה לחלקים</option>
-                                 <option>ביצוע תיקון</option>
-                                 <option>בדיקת איכות</option>
-                                 <option>סיום טיפול</option>
-                                 <option>יצירת קשר עם לקוח</option>
-                             </select>
-                             <input name="notes" placeholder="פרט מה בוצע, תוצאות או הערות..." class="border rounded p-2 text-sm flex-1" required>
-                        </div>
-                        <div class="flex justify-end">
-                            <button type="submit" class="bg-blue-600 text-white px-4 py-1 rounded text-sm hover:bg-blue-700">הוסף ליומן</button>
-                        </div>
-                    </form>
-                 </div>
-                 
-                 <div class="relative border-r-2 border-gray-200 mr-3 space-y-6">
-                    ${timeline.map((item, idx) => `
-                        <div class="timeline-item ${idx === 0 ? 'active' : ''} mr-6 relative">
-                            <div class="text-xs text-gray-500 mb-1 flex justify-between">
-                                <span>${Utils.formatDate(item.date)}</span>
-                                <span class="font-bold">${item.user || 'מערכת'}</span>
-                            </div>
-                            <div class="bg-white p-3 rounded border shadow-sm">
-                                <div class="font-bold text-blue-700 text-sm mb-1">${item.action}</div>
-                                <div class="text-sm text-gray-700">${item.notes}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                    ${timeline.length === 0 ? '<div class="mr-6 text-gray-400 text-sm">אין רישומים ביומן עדיין.</div>' : ''}
-                 </div>
-            `;
-
-            const historyContent = `
-                <div class="space-y-3 mt-4">
-                    ${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}
-                    ${customerHistory.map(t => `
-                        <div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-1">
-                                    <span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span>
-                                    <span class="font-medium text-gray-800">${t.bikeModel}</span>
-                                </div>
-                                <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
-                            </div>
-                            <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                ${window.app.getStatusBadge(t.status)}
-                                <div class="text-xs text-gray-500 flex items-center gap-1">
-                                    <i data-lucide="calendar" class="w-3"></i>
-                                    ${Utils.formatDate(t.createdAt).split(',')[0]}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            
-            const renderInput = (field, value, type="text") => {
-                if(window.app.isEditingDetails) {
-                    return `<input data-field="${field}" value="${value || ''}" class="w-full border rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-200">`;
-                }
-                return `<div class="text-gray-800 font-medium">${value || '-'}</div>`;
-            };
-
-            container.innerHTML = `
-                <div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg">
-                    <div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto flex flex-col">
-                        <div class="flex justify-between items-start mb-6">
-                            <div>
-                                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                                    תיקון #
-                                    ${ticket.ticketNumber}
-                                    ${ticket.tagNumber ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full border border-yellow-200">תג: ${ticket.tagNumber}</span>` : ''}
-                                </h2>
-                                <div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="window.app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${window.app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}">
-                                    <i data-lucide="${window.app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i>
-                                </button>
-                                <button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label>
-                            <div class="flex flex-wrap gap-2">
-                                ${Object.entries(STATUSES)
-                                    .filter(([k]) => k !== 'archived') 
-                                    .map(([k, v]) => `
-                                    <button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>
-                                `).join('')}
-                                
-                                ${ticket.status === 'archived' ? 
-                                    `<span class="px-3 py-1 text-xs rounded-full border bg-gray-200 text-gray-600 border-gray-300">בארכיון</span>` 
-                                : ''}
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-4 flex-1">
-                            <div class="bg-white p-4 rounded border relative group">
-                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3>
-                                <div class="space-y-2 text-sm">
-                                    <div><span class="text-gray-400 text-xs">שם:</span> ${renderInput('customerName', ticket.customerName)}</div>
-                                    <div><span class="text-gray-400 text-xs">טלפון:</span> ${renderInput('customerPhone', ticket.customerPhone)}</div>
-                                    <div><span class="text-gray-400 text-xs">אימייל:</span> ${renderInput('customerEmail', ticket.customerEmail)}</div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white p-4 rounded border mb-4">
-                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="tag" class="w-4"></i> מספר תג</h3>
-                                <div class="space-y-2 text-sm">
-                                     ${renderInput('tagNumber', ticket.tagNumber)}
-                                </div>
-                            </div>
-
-                            <div class="bg-white p-4 rounded border">
-                                <h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3>
-                                <div class="space-y-2 text-sm">
-                                    <div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div>
-                                    <div>
-                                        <span class="text-gray-400 text-xs">תקלה:</span>
-                                        ${window.app.isEditingDetails 
-                                            ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>`
-                                            : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            ${window.app.isEditingDetails ? `
-                                <button onclick="window.app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4">
-                                    <i data-lucide="save" class="w-4"></i> שמור שינויים
-                                </button>
-                            ` : ''}
-
-                            <div class="mt-8 border-t pt-4">
-                                <button onclick="window.app.archiveTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors">
-                                    <i data-lucide="archive" class="w-4 h-4"></i> העבר לארכיון
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden">
-                        <!-- Tabs -->
-                        <div class="flex border-b bg-gray-50">
-                            <button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button>
-                            <button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button>
-                            <button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button>
-                        </div>
-                        <div class="p-6 overflow-y-auto h-full">
-                            ${window.app.activeTicketTab === 'details' ? detailsContent : 
-                              window.app.activeTicketTab === 'timeline' ? timelineContent : 
-                              historyContent}
-                        </div>
-                    </div>
-                </div>
-            `;
-            
+            const detailsContent = `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">הצעת מחיר וטיפול</h3><div class="flex gap-2"><button onclick="window.app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button><button onclick="window.app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button></div></div><div class="bg-white border rounded-lg overflow-hidden mb-6"><table class="w-full text-right text-sm" id="quote-table"><thead class="bg-gray-50 border-b"><tr><th class="p-3 w-10 text-center">בוצע</th><th class="p-3">תיאור</th><th class="p-3 w-20">כמות</th><th class="p-3 w-24">מחיר</th><th class="p-3 w-24">סה״כ</th><th class="p-3 w-10"></th></tr></thead><tbody id="quote-items-body"></tbody><tfoot class="bg-gray-50"><tr><td colspan="6" class="p-2 text-center"><button onclick="window.app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr></tfoot></table><div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg"><span>סה״כ לתשלום:</span><span id="quote-total">0.00 ₪</span></div></div><div class="border rounded-lg p-4 bg-gray-50"><h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="pen-tool" class="w-4"></i> חתימת לקוח</h4><div id="signature-area">${ticket.quote.isSigned ? `<div class="text-center text-green-600 font-bold"><i data-lucide="check" class="w-5 inline"></i> נחתם ב-${Utils.formatDate(ticket.quote.signedAt)}</div><button onclick="window.app.clearSignature()" class="text-xs text-red-500 underline mt-2">נקה חתימה</button>` : `<canvas id="sig-canvas" class="w-full h-32 bg-white border border-dashed border-gray-300 touch-none"></canvas><button onclick="window.app.saveSignature()" class="mt-2 bg-blue-600 text-white px-4 py-1 rounded text-sm">אשר חתימה</button>`}</div></div>`;
+            const timelineContent = `<div class="bg-white p-4 rounded-lg border mb-4"><h4 class="font-bold mb-3">הוסף תיעוד חדש</h4><form onsubmit="window.app.addTimelineEntry(event)" class="space-y-3"><div class="flex gap-2"><select name="action" class="border rounded p-2 text-sm w-1/3"><option>בדיקה ראשונית</option><option>המתנה לחלקים</option><option>ביצוע תיקון</option><option>בדיקת איכות</option><option>סיום טיפול</option><option>יצירת קשר עם לקוח</option></select><input name="notes" placeholder="פרט מה בוצע, תוצאות או הערות..." class="border rounded p-2 text-sm flex-1" required></div><div class="flex justify-end"><button type="submit" class="bg-blue-600 text-white px-4 py-1 rounded text-sm hover:bg-blue-700">הוסף ליומן</button></div></form></div><div class="relative border-r-2 border-gray-200 mr-3 space-y-6">${timeline.map((item, idx) => `<div class="timeline-item ${idx === 0 ? 'active' : ''} mr-6 relative"><div class="text-xs text-gray-500 mb-1 flex justify-between"><span>${Utils.formatDate(item.date)}</span><span class="font-bold">${item.user || 'מערכת'}</span></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-blue-700 text-sm mb-1">${item.action}</div><div class="text-sm text-gray-700">${item.notes}</div></div></div>`).join('')}${timeline.length === 0 ? '<div class="mr-6 text-gray-400 text-sm">אין רישומים ביומן עדיין.</div>' : ''}</div>`;
+            const historyContent = `<div class="space-y-3 mt-4">${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}${customerHistory.map(t => `<div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4"><div class="flex-1"><div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span><span class="font-medium text-gray-800">${t.bikeModel}</span></div><div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div></div><div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">${window.app.getStatusBadge(t.status)}<div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div></div></div>`).join('')}</div>`;
+            const renderInput = (field, value) => window.app.isEditingDetails ? `<input data-field="${field}" value="${value || ''}" class="w-full border rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-200">` : `<div class="text-gray-800 font-medium">${value || '-'}</div>`;
+            container.innerHTML = `<div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg"><div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto flex flex-col"><div class="flex justify-between items-start mb-6"><div><h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">תיקון #${ticket.ticketNumber}${ticket.tagNumber ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full border border-yellow-200">תג: ${ticket.tagNumber}</span>` : ''}</h2><div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div></div><div class="flex gap-2"><button onclick="window.app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${window.app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}"><i data-lucide="${window.app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i></button><button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button></div></div><div class="mb-6"><label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label><div class="flex flex-wrap gap-2">${Object.entries(STATUSES).map(([k, v]) => `<button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>`).join('')}</div></div><div class="space-y-4 flex-1"><div class="bg-white p-4 rounded border relative group"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">שם:</span> ${renderInput('customerName', ticket.customerName)}</div><div><span class="text-gray-400 text-xs">טלפון:</span> ${renderInput('customerPhone', ticket.customerPhone)}</div><div><span class="text-gray-400 text-xs">אימייל:</span> ${renderInput('customerEmail', ticket.customerEmail)}</div></div></div><div class="bg-white p-4 rounded border mb-4"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="tag" class="w-4"></i> מספר תג</h3><div class="space-y-2 text-sm">${renderInput('tagNumber', ticket.tagNumber)}</div></div><div class="bg-white p-4 rounded border"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div><div><span class="text-gray-400 text-xs">תקלה:</span>${window.app.isEditingDetails ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>` : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`}</div></div></div>${window.app.isEditingDetails ? `<button onclick="window.app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4"><i data-lucide="save" class="w-4"></i> שמור שינויים</button>` : ''}<div class="mt-8 border-t pt-4"><button onclick="window.app.archiveTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"><i data-lucide="archive" class="w-4 h-4"></i> העבר לארכיון</button></div></div></div><div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden"><div class="flex border-b bg-gray-50"><button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button><button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button><button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button></div><div class="p-6 overflow-y-auto h-full">${window.app.activeTicketTab === 'details' ? detailsContent : window.app.activeTicketTab === 'timeline' ? timelineContent : historyContent}</div></div></div>`;
             lucide.createIcons();
-            if(window.app.activeTicketTab === 'details') {
-                window.app.renderQuoteItems();
-                if(!ticket.quote.isSigned) window.app.initCanvas();
-            }
+            if(window.app.activeTicketTab === 'details') { window.app.renderQuoteItems(); if(!ticket.quote.isSigned) window.app.initCanvas(); }
         },
 
         renderQuoteItems: () => {
-            const tbody = document.getElementById('quote-items-body');
-            if(!tbody) return; 
-            
+            const tbody = document.getElementById('quote-items-body'); if(!tbody) return; 
             const items = window.app.currentTicket.quote.items || [];
-            
-            tbody.innerHTML = items.map((item, idx) => `
-                <tr id="quote-row-${idx}">
-                    <td class="p-2 text-center">
-                        <input type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" 
-                            ${item.completed ? 'checked' : ''} 
-                            onchange="window.app.toggleQuoteItemCompletion(${idx})">
-                    </td>
-                    <td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="window.app.updateQuoteItem(${idx}, 'description', this.value)"></td>
-                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="window.app.updateQuoteItem(${idx}, 'quantity', this.value)"></td>
-                    <td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="window.app.updateQuoteItem(${idx}, 'price', this.value)"></td>
-                    <td class="p-2 row-total">${Utils.formatCurrency(item.quantity * item.price)}</td>
-                    <td class="p-2 text-center"><button onclick="window.app.removeQuoteItem(${idx})" class="text-red-500"><i data-lucide="x" class="w-4"></i></button></td>
-                </tr>
-            `).join('');
-            
-            window.app.updateQuoteTotal();
-            lucide.createIcons();
+            tbody.innerHTML = items.map((item, idx) => `<tr id="quote-row-${idx}"><td class="p-2 text-center"><input type="checkbox" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer" ${item.completed ? 'checked' : ''} onchange="window.app.toggleQuoteItemCompletion(${idx})"></td><td class="p-2"><input class="w-full border rounded p-1" value="${item.description}" oninput="window.app.updateQuoteItem(${idx}, 'description', this.value)"></td><td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.quantity}" oninput="window.app.updateQuoteItem(${idx}, 'quantity', this.value)"></td><td class="p-2"><input type="number" class="w-full border rounded p-1" value="${item.price}" oninput="window.app.updateQuoteItem(${idx}, 'price', this.value)"></td><td class="p-2 row-total">${Utils.formatCurrency(item.quantity * item.price)}</td><td class="p-2 text-center"><button onclick="window.app.removeQuoteItem(${idx})" class="text-red-500"><i data-lucide="x" class="w-4"></i></button></td></tr>`).join('');
+            window.app.updateQuoteTotal(); lucide.createIcons();
         },
 
         updateQuoteItem: (idx, field, val) => {
-            const item = window.app.currentTicket.quote.items[idx];
-            item[field] = field === 'description' ? val : parseFloat(val) || 0;
-            
-            if (field !== 'description') {
-                const row = document.getElementById(`quote-row-${idx}`);
-                if(row) {
-                    row.querySelector('.row-total').innerText = Utils.formatCurrency(item.quantity * item.price);
-                }
-            }
+            const item = window.app.currentTicket.quote.items[idx]; item[field] = field === 'description' ? val : parseFloat(val) || 0;
+            if (field !== 'description') { const row = document.getElementById(`quote-row-${idx}`); if(row) row.querySelector('.row-total').innerText = Utils.formatCurrency(item.quantity * item.price); }
             window.app.updateQuoteTotal();
         },
 
-        toggleQuoteItemCompletion: (idx) => {
-            const item = window.app.currentTicket.quote.items[idx];
-            item.completed = !item.completed;
-            window.app.saveQuote();
-        },
-
-        updateQuoteTotal: () => {
-             const items = window.app.currentTicket.quote.items;
-             const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
-             window.app.currentTicket.quote.total = total;
-             const totalEl = document.getElementById('quote-total');
-             if(totalEl) totalEl.innerText = Utils.formatCurrency(total);
-        },
-
-        addQuoteItem: () => {
-            if(!window.app.currentTicket.quote.items) window.app.currentTicket.quote.items = [];
-            window.app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false });
-            window.app.renderQuoteItems(); 
-        },
-
-        removeQuoteItem: (idx) => {
-            window.app.currentTicket.quote.items.splice(idx, 1);
-            window.app.renderQuoteItems();
-        },
-
-        saveQuote: async () => {
-            await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
-            Utils.showToast('השינויים נשמרו');
-        },
-
-        updateStatus: async (newStatus) => {
+        toggleQuoteItemCompletion: (idx) => { const item = window.app.currentTicket.quote.items[idx]; item.completed = !item.completed; window.app.saveQuote(); },
+        updateQuoteTotal: () => { const items = window.app.currentTicket.quote.items; const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0); window.app.currentTicket.quote.total = total; const totalEl = document.getElementById('quote-total'); if(totalEl) totalEl.innerText = Utils.formatCurrency(total); },
+        addQuoteItem: () => { if(!window.app.currentTicket.quote.items) window.app.currentTicket.quote.items = []; window.app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false }); window.app.renderQuoteItems(); },
+        removeQuoteItem: (idx) => { window.app.currentTicket.quote.items.splice(idx, 1); window.app.renderQuoteItems(); },
+        saveQuote: async () => { await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote }); Utils.showToast('השינויים נשמרו'); },
+        
+        updateStatus: async (newStatus) => { 
             window.app.currentTicket.status = newStatus;
-            await DB.update(window.app.currentTicket.id, { status: newStatus });
-            window.app.tickets = await DB.getAll(); // Refresh global list
+            // סנכרון דגל הארכיון אם הסטטוס נבחר ידנית כ'בארכיון'
+            const isArchived = newStatus === 'archived';
+            await DB.update(window.app.currentTicket.id, { 
+                status: newStatus,
+                is_archived: isArchived 
+            }); 
+            window.app.tickets = await DB.getAll(); 
             window.app.renderTicketDetail(); 
-            Utils.showToast('סטטוס עודכן');
+            Utils.showToast('סטטוס עודכן'); 
         },
 
-        // PDF Print
         printTicket: () => {
-            const ticket = window.app.currentTicket;
-            const printWindow = window.open('', '_blank');
-            
-            // Calculate totals
-            const items = ticket.quote.items || [];
-            const subtotal = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
-            const discount = ticket.quote.discount || 0;
-            const total = subtotal - discount;
-
-            const html = `
-                <html dir="rtl">
-                <head>
-                    <title>הצעת מחיר - תיקון #${ticket.ticketNumber}</title>
-                    <style>
-                        body { font-family: 'Heebo', sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }
-                        .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
-                        .logo { font-size: 24px; font-weight: bold; color: #2563eb; }
-                        .meta { text-align: left; font-size: 14px; color: #666; }
-                        .title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
-                        .grid-container { display: flex; gap: 40px; margin-bottom: 30px; }
-                        .col { flex: 1; }
-                        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }
-                        .row { margin-bottom: 5px; font-size: 14px; }
-                        .label { font-weight: 500; color: #555; }
-                        
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th { text-align: right; background: #f9fafb; padding: 10px; font-size: 14px; border-bottom: 1px solid #ddd; }
-                        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-                        
-                        .totals { margin-top: 0; margin-left: 0; margin-right: auto; width: 300px; }
-                        .total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-                        .grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; margin-top: 10px; padding-top: 10px; }
-                        
-                        .signature-section { margin-top: 60px; text-align: center; page-break-inside: avoid; }
-                        .sig-img { max-height: 100px; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
-                        
-                        .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
-                        
-                        @media print {
-                            body { padding: 0; }
-                            button { display: none; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="logo">BikeCare Workshop CRM</div>
-                        <div class="meta">
-                            <div>תאריך: ${new Date().toLocaleDateString('he-IL')}</div>
-                            <div>מספר תיקון: #${ticket.ticketNumber}</div>
-                        </div>
-                    </div>
-
-                    <div class="title">הצעת מחיר / כרטיס עבודה</div>
-
-                    <div class="grid-container">
-                        <div class="col">
-                            <div class="section-title">פרטי לקוח</div>
-                            <div class="row"><span class="label">שם:</span> ${ticket.customerName}</div>
-                            <div class="row"><span class="label">טלפון:</span> ${ticket.customerPhone}</div>
-                            <div class="row"><span class="label">אימייל:</span> ${ticket.customerEmail || '-'}</div>
-                        </div>
-                        <div class="col">
-                            <div class="section-title">פרטי אופניים</div>
-                            <div class="row"><span class="label">דגם:</span> ${ticket.bikeModel}</div>
-                            <div class="row"><span class="label">תקלה:</span> ${ticket.issueDescription}</div>
-                            ${ticket.tagNumber ? `<div class="row"><span class="label">מספר תג:</span> ${ticket.tagNumber}</div>` : ''}
-                        </div>
-                    </div>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>תיאור</th>
-                                <th style="width: 60px">כמות</th>
-                                <th style="width: 100px">מחיר יח׳</th>
-                                <th style="width: 100px">סה״כ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${items.map(item => `
-                                <tr>
-                                    <td>${item.description}</td>
-                                    <td>${item.quantity}</td>
-                                    <td>${Utils.formatCurrency(item.price)}</td>
-                                    <td>${Utils.formatCurrency(item.quantity * item.price)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-
-                    <div class="totals">
-                        <div class="total-row">
-                            <span>סכום ביניים:</span>
-                            <span>${Utils.formatCurrency(subtotal)}</span>
-                        </div>
-                        <div class="total-row">
-                            <span>הנחה:</span>
-                            <span>${Utils.formatCurrency(discount)}</span>
-                        </div>
-                        <div class="total-row grand-total">
-                            <span>סה״כ לתשלום:</span>
-                            <span>${Utils.formatCurrency(total)}</span>
-                        </div>
-                    </div>
-
-                    <div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>
-
-                    <div class="footer">
-                        הופק על ידי מערכת BikeCare Workshop CRM
-                    </div>
-
-                    <script>
-                        window.onload = function() { window.print(); }
-                    <\/script>
-                </body>
-                </html>
-            `;
-            
-            printWindow.document.write(html);
-            printWindow.document.close();
+            const ticket = window.app.currentTicket; const printWindow = window.open('', '_blank');
+            const items = ticket.quote.items || []; const subtotal = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+            const discount = ticket.quote.discount || 0; const total = subtotal - discount;
+            const html = `<html dir="rtl"><head><title>הצעת מחיר - תיקון #${ticket.ticketNumber}</title><style>body { font-family: 'Heebo', sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }.header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }.logo { font-size: 24px; font-weight: bold; color: #2563eb; }.meta { text-align: left; font-size: 14px; color: #666; }.title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }.grid-container { display: flex; gap: 40px; margin-bottom: 30px; }.col { flex: 1; }.section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }.row { margin-bottom: 5px; font-size: 14px; }.label { font-weight: 500; color: #555; }table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }th { text-align: right; background: #f9fafb; padding: 10px; font-size: 14px; border-bottom: 1px solid #ddd; }td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }.totals { margin-top: 0; margin-left: 0; margin-right: auto; width: 300px; }.total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }.grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; margin-top: 10px; padding-top: 10px; }.signature-section { margin-top: 60px; text-align: center; page-break-inside: avoid; }.sig-img { max-height: 100px; border-bottom: 1px solid #ccc; margin-bottom: 10px; }.footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }@media print { body { padding: 0; } button { display: none; } }</style></head><body><div class="header"><div class="logo">BikeCare Workshop CRM</div><div class="meta"><div>תאריך: ${new Date().toLocaleDateString('he-IL')}</div><div>מספר תיקון: #${ticket.ticketNumber}</div></div></div><div class="title">הצעת מחיר / כרטיס עבודה</div><div class="grid-container"><div class="col"><div class="section-title">פרטי לקוח</div><div class="row"><span class="label">שם:</span> ${ticket.customerName}</div><div class="row"><span class="label">טלפון:</span> ${ticket.customerPhone}</div><div class="row"><span class="label">אימייל:</span> ${ticket.customerEmail || '-'}</div></div><div class="col"><div class="section-title">פרטי אופניים</div><div class="row"><span class="label">דגם:</span> ${ticket.bikeModel}</div><div class="row"><span class="label">תקלה:</span> ${ticket.issueDescription}</div>${ticket.tagNumber ? `<div class="row"><span class="label">מספר תג:</span> ${ticket.tagNumber}</div>` : ''}</div></div><table><thead><tr><th>תיאור</th><th style="width: 60px">כמות</th><th style="width: 100px">מחיר יח׳</th><th style="width: 100px">סה״כ</th></tr></thead><tbody>${items.map(item => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${Utils.formatCurrency(item.price)}</td><td>${Utils.formatCurrency(item.quantity * item.price)}</td></tr>`).join('')}</tbody></table><div class="totals"><div class="total-row"><span>סכום ביניים:</span><span>${Utils.formatCurrency(subtotal)}</span></div><div class="total-row"><span>הנחה:</span><span>${Utils.formatCurrency(discount)}</span></div><div class="total-row grand-total"><span>סה״כ לתשלום:</span><span>${Utils.formatCurrency(total)}</span></div></div>${ticket.quote.isSigned ? `<div class="signature-section"><img src="${ticket.quote.signature}" class="sig-img" alt="חתימה" /><div>חתימת לקוח</div><div style="font-size: 12px; color: #666; margin-top: 5px;">נחתם בתאריך: ${Utils.formatDate(ticket.quote.signedAt)}</div></div>` : '<div class="signature-section" style="margin-top: 100px; border-bottom: 1px solid #ccc; width: 200px; margin-right: auto; margin-left: auto;">חתימת לקוח</div>'}<div class="footer">הופק על ידי מערכת BikeCare Workshop CRM</div><script>window.onload = function() { window.print(); }<\/script></body></html>`;
+            printWindow.document.write(html); printWindow.document.close();
         },
 
-        // Helpers
         getStatusBadge: (status, textOnly = false) => {
             const s = STATUSES[status] || STATUSES.new;
-            if(textOnly) return s.label;
-            return `<span class="px-2 py-1 rounded-full text-xs font-medium ${s.color}">${s.label}</span>`;
+            if(textOnly) return s.label; return `<span class="px-2 py-1 rounded-full text-xs font-medium ${s.color}">${s.label}</span>`;
         },
         getPriorityLabel: (p) => (PRIORITIES[p] || PRIORITIES.normal).label
     };
@@ -2145,19 +1617,15 @@ initCanvas: () => {
         navigate: (target) => {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
             document.getElementById(`view-${target}`).classList.add('active');
-            
-            // Highlight sidebar nav
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 if(btn.dataset.target === target) btn.classList.add('bg-blue-50', 'text-blue-700');
                 else btn.classList.remove('bg-blue-50', 'text-blue-700');
             });
-
             if(target === 'dashboard') window.app.renderDashboard();
             if(target === 'tickets') window.app.renderTickets();
             if(target === 'customers') window.app.renderCustomers();
             if(target === 'secondhand') window.app.renderBikes();
             if(target === 'archive') window.app.renderArchive();
-
             closeMobileMenu();
         }
     };
