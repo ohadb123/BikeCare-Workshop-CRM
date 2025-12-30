@@ -38,6 +38,10 @@ const DB = createDB(sb, Utils);
     // --- CANVAS MODE DETECTOR ---
     const CANVAS_MODE = new URLSearchParams(window.location.search).get("canvas") === "1" || localStorage.getItem("CANVAS_MODE") === "1";
 
+    // --- Race Condition Protection ---
+    let currentRequestId = 0;
+    const getRequestId = () => ++currentRequestId;
+
     // --- App Logic ---
     window.app = {
         tickets: [],
@@ -55,6 +59,22 @@ const DB = createDB(sb, Utils);
         started: false,
         listenersBound: false,
         refreshIntervalId: null,
+        
+        // Cleanup function for memory leaks
+        cleanup: () => {
+            if (window.app.refreshIntervalId) {
+                clearInterval(window.app.refreshIntervalId);
+                window.app.refreshIntervalId = null;
+            }
+            if (window.app.chartInstance) {
+                try {
+                    window.app.chartInstance.destroy();
+                } catch (e) {
+                    console.warn('Error destroying chart:', e);
+                }
+                window.app.chartInstance = null;
+            }
+        },
 
         init: async () => {
             if(!sb) {
@@ -87,7 +107,7 @@ const DB = createDB(sb, Utils);
                 } else {
                     window.app.started = false;
                     window.app.listenersBound = false;
-                    if (window.app.refreshIntervalId) clearInterval(window.app.refreshIntervalId);
+                    window.app.cleanup();
                     window.app.user = null;
                     window.app.showLogin();
                 }
@@ -98,49 +118,86 @@ const DB = createDB(sb, Utils);
 
         startApp: async () => {
             if (window.app.started) return;
-            window.app.started = true;
+            
+            try {
+                window.app.started = true;
 
-            // Auth Check (Allowlist) - Only if NOT in Canvas Mode
-            if (!CANVAS_MODE) {
-                const { data: allowRow, error: allowErr } = await sb
-                    .from('allowed_users')
-                    .select('email')
-                    .eq('email', window.app.user?.email || '')
-                    .maybeSingle();
+                // Cleanup any existing intervals/charts
+                window.app.cleanup();
 
-                if (allowErr || !allowRow) {
-                    await sb.auth.signOut();
-                    window.app.user = null;
-                    window.app.showLogin();
-                    Utils.showToast('אין לך הרשאה להיכנס למערכת. פנה למנהל המערכת.', 'error');
-                    return;
+                // Migrate legacy localStorage data to Supabase
+                if (DB.init) {
+                    await DB.init();
                 }
-            }
 
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app-container').classList.remove('hidden');
-            
-            window.app.tickets = await DB.getAll();
-            window.app.bikes = BikeDB.getAll();
-            
-            window.app.setupListeners();
-            router.navigate('dashboard');
-            
-            if (window.app.refreshIntervalId) clearInterval(window.app.refreshIntervalId);
-            window.app.refreshIntervalId = setInterval(async () => {
-                if(document.visibilityState === 'visible' && window.app.user) {
-                    const freshData = await DB.getAll();
-                    if (freshData.length !== window.app.tickets.length) {
-                          window.app.tickets = freshData;
-                          const currentView = document.querySelector('.view-section.active').id;
-                          if(currentView === 'view-dashboard') window.app.renderDashboard();
-                          if(currentView === 'view-tickets') window.app.renderTickets();
-                          if(currentView === 'view-archive') window.app.renderArchive();
-                    } else {
-                        window.app.tickets = freshData;
+                // Auth Check (Allowlist) - Only if NOT in Canvas Mode
+                if (!CANVAS_MODE) {
+                    const { data: allowRow, error: allowErr } = await sb
+                        .from('allowed_users')
+                        .select('email')
+                        .eq('email', window.app.user?.email || '')
+                        .maybeSingle();
+
+                    if (allowErr || !allowRow) {
+                        await sb.auth.signOut();
+                        window.app.user = null;
+                        window.app.showLogin();
+                        Utils.showToast('אין לך הרשאה להיכנס למערכת. פנה למנהל המערכת.', 'error');
+                        return;
                     }
                 }
-            }, 10000);
+
+                const loginScreen = document.getElementById('login-screen');
+                const appContainer = document.getElementById('app-container');
+                if (loginScreen) loginScreen.style.display = 'none';
+                if (appContainer) appContainer.classList.remove('hidden');
+                
+                // Fetch data with race condition protection
+                const requestId = getRequestId();
+                const [ticketsData, bikesData] = await Promise.all([
+                    DB.getAll(),
+                    Promise.resolve(BikeDB.getAll())
+                ]);
+                
+                // Only update if this is still the latest request and user is still logged in
+                if (requestId === currentRequestId && window.app.user) {
+                    window.app.tickets = ticketsData || [];
+                    window.app.bikes = bikesData || [];
+                }
+                
+                window.app.setupListeners();
+                router.navigate('dashboard');
+                
+                // Setup refresh interval with race condition protection
+                window.app.refreshIntervalId = setInterval(async () => {
+                    if (document.visibilityState === 'visible' && window.app.user) {
+                        const refreshRequestId = getRequestId();
+                        try {
+                            const freshData = await DB.getAll();
+                            
+                            // Only update if this is still the latest request and user is still logged in
+                            if (refreshRequestId === currentRequestId && window.app.user) {
+                                const lengthChanged = freshData.length !== window.app.tickets.length;
+                                window.app.tickets = freshData || [];
+                                
+                                if (lengthChanged) {
+                                    const currentView = document.querySelector('.view-section.active')?.id;
+                                    if (currentView === 'view-dashboard') window.app.renderDashboard();
+                                    if (currentView === 'view-tickets') window.app.renderTickets();
+                                    if (currentView === 'view-archive') window.app.renderArchive();
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error refreshing data:', error);
+                            // Don't show toast on every refresh error to avoid spam
+                        }
+                    }
+                }, 10000);
+            } catch (error) {
+                console.error('Error starting app:', error);
+                Utils.showToast('שגיאה בהפעלת האפליקציה', 'error');
+                window.app.started = false;
+            }
         },
 
         showLogin: () => {
@@ -181,16 +238,21 @@ const DB = createDB(sb, Utils);
             const createTicketForm = document.getElementById('create-ticket-form');
             createTicketForm.onsubmit = async (e) => {
                 e.preventDefault();
-                console.count("create-ticket submit fired");
-
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData.entries());
-                
-                if (data.ticketNumber) {
-                    data.ticketNumber = parseInt(data.ticketNumber);
-                }
                 
                 try {
+                    const formData = new FormData(e.target);
+                    const data = Object.fromEntries(formData.entries());
+                    
+                    // Basic validation
+                    if (!data.customerName || !data.customerPhone || !data.bikeModel || !data.issueDescription) {
+                        Utils.showToast('אנא מלא את כל השדות הנדרשים', 'error');
+                        return;
+                    }
+                    
+                    if (data.ticketNumber) {
+                        data.ticketNumber = parseInt(data.ticketNumber);
+                    }
+                    
                     const nextId = window.app.getNextTicketNumber();
                     
                     await DB.add({
@@ -199,15 +261,22 @@ const DB = createDB(sb, Utils);
                         status: 'new',
                         quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false },
                         timeline: [],
-                        history: [{date: new Date().toISOString(), action: 'נוצר', user: window.app.user.email}]
+                        history: [{date: new Date().toISOString(), action: 'נוצר', user: window.app.user?.email || 'מערכת'}]
                     });
                     
-                    window.app.tickets = await DB.getAll();
+                    // Refresh tickets with race condition protection
+                    const requestId = getRequestId();
+                    const freshTickets = await DB.getAll();
+                    if (requestId === currentRequestId && window.app.user) {
+                        window.app.tickets = freshTickets;
+                    }
+                    
                     e.target.reset();
                     Utils.showToast('כרטיס נפתח בהצלחה');
                     router.navigate('tickets');
                 } catch(err) {
-                    console.error(err);
+                    console.error('Error creating ticket:', err);
+                    Utils.showToast('שגיאה בפתיחת כרטיס', 'error');
                 }
             };
 
@@ -293,7 +362,11 @@ const DB = createDB(sb, Utils);
                  const datalist = document.getElementById('customers-datalist');
                  if(datalist) {
                      const customers = window.app.getCustomers();
-                     datalist.innerHTML = customers.map(c => `<option value="${c.name}">${c.phone}</option>`).join('');
+                     datalist.innerHTML = customers.map(c => {
+                         const safeName = window.app.safeAttr(c.name);
+                         const safePhone = window.app.safeHtml(c.phone);
+                         return `<option value="${safeName}">${safePhone}</option>`;
+                     }).join('');
                  }
             }
             
@@ -317,6 +390,18 @@ const DB = createDB(sb, Utils);
             if (days <= 2) return 'bg-gray-100 text-gray-600 border-gray-200';
             if (days <= 5) return 'bg-orange-50 text-orange-600 border-orange-200';
             return 'bg-red-50 text-red-600 border-red-200';
+        },
+        
+        // Safe HTML rendering helper to prevent XSS
+        safeHtml: (str) => {
+            if (str == null) return '';
+            return Utils.escapeHtml(String(str));
+        },
+        
+        // Safe attribute rendering
+        safeAttr: (str) => {
+            if (str == null) return '';
+            return Utils.escapeAttr(String(str));
         },
         
         renderDashboard: () => {
@@ -462,17 +547,20 @@ const DB = createDB(sb, Utils);
                 attentionList.innerHTML = urgentTickets.map(ticket => {
                     const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
                     const dayColorClass = window.app.getDaysColor(ticket.diffDays);
+                    const safeId = window.app.safeAttr(ticket.id);
+                    const safeCustomerName = window.app.safeHtml(ticket.customerName || '');
+                    const safeBikeModel = window.app.safeHtml(ticket.bikeModel || '');
                     return `
-                    <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="window.app.openTicket('${ticket.id}')">
-                        <td class="p-3 text-gray-800 font-medium">${ticket.customerName}</td>
-                        <td class="p-3 text-gray-600">${ticket.bikeModel}</td>
+                    <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="window.app.openTicket('${safeId}')">
+                        <td class="p-3 text-gray-800 font-medium">${safeCustomerName}</td>
+                        <td class="p-3 text-gray-600">${safeBikeModel}</td>
                         <td class="p-3">${window.app.getStatusBadge(ticket.status)}</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${dayColorClass}">
                                 ${ticket.diffDays}
                             </span>
                         </td>
-                        <td class="p-3 text-sm text-gray-500 whitespace-normal leading-snug min-w-[200px]">${actionText}</td>
+                        <td class="p-3 text-sm text-gray-500 whitespace-normal leading-snug min-w-[200px]">${window.app.safeHtml(actionText)}</td>
                     </tr>
                     `;
                 }).join('');
@@ -526,17 +614,24 @@ const DB = createDB(sb, Utils);
                 return;
             }
 
-            tbody.innerHTML = filtered.map(t => `
-                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${t.id}')">
-                    <td class="p-4 font-mono font-bold text-blue-600">#${t.ticketNumber}</td>
-                    <td class="p-4 font-medium">${t.customerName}</td>
-                    <td class="p-4 hidden md:table-cell text-gray-600">${t.customerPhone}</td>
-                    <td class="p-4 text-gray-800">${t.bikeModel}</td>
+            tbody.innerHTML = filtered.map(t => {
+                const safeId = window.app.safeAttr(t.id);
+                const safeTicketNumber = window.app.safeHtml(t.ticketNumber);
+                const safeCustomerName = window.app.safeHtml(t.customerName || '');
+                const safeCustomerPhone = window.app.safeHtml(t.customerPhone || '');
+                const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                return `
+                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
+                    <td class="p-4 font-mono font-bold text-blue-600">#${safeTicketNumber}</td>
+                    <td class="p-4 font-medium">${safeCustomerName}</td>
+                    <td class="p-4 hidden md:table-cell text-gray-600">${safeCustomerPhone}</td>
+                    <td class="p-4 text-gray-800">${safeBikeModel}</td>
                     <td class="p-4">${window.app.getStatusBadge(t.status)}</td>
                     <td class="p-4 hidden md:table-cell">${window.app.getPriorityLabel(t.priority)}</td>
                     <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdAt)}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         },
         
         renderArchive: () => {
@@ -554,15 +649,21 @@ const DB = createDB(sb, Utils);
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">הארכיון ריק או לא נמצאו תוצאות</td></tr>`;
             } else {
-                tbody.innerHTML = filtered.map(t => `
-                    <tr class="hover:bg-gray-50 border-b border-gray-100 cursor-pointer text-gray-500" onclick="window.app.openTicket('${t.id}')">
-                        <td class="p-4 font-mono">#${t.ticketNumber}</td>
-                        <td class="p-4">${t.customerName}</td>
-                        <td class="p-4">${t.bikeModel}</td>
+                tbody.innerHTML = filtered.map(t => {
+                    const safeId = window.app.safeAttr(t.id);
+                    const safeTicketNumber = window.app.safeHtml(t.ticketNumber);
+                    const safeCustomerName = window.app.safeHtml(t.customerName || '');
+                    const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                    return `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100 cursor-pointer text-gray-500" onclick="window.app.openTicket('${safeId}')">
+                        <td class="p-4 font-mono">#${safeTicketNumber}</td>
+                        <td class="p-4">${safeCustomerName}</td>
+                        <td class="p-4">${safeBikeModel}</td>
                         <td class="p-4 text-xs">${window.app.getStatusBadge(t.status)}</td>
                         <td class="p-4 text-sm">${Utils.formatDate(t.createdAt)}</td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             }
             lucide.createIcons();
         },
@@ -590,15 +691,21 @@ const DB = createDB(sb, Utils);
 
             const tbody = document.getElementById('customers-table-body');
             if(tbody) {
-                tbody.innerHTML = customers.map(c => `
-                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openCustomer('${c.phone}')">
-                        <td class="p-4 font-medium">${c.name}</td>
-                        <td class="p-4">${c.phone}</td>
-                        <td class="p-4 hidden md:table-cell text-gray-500">${c.email || '-'}</td>
+                tbody.innerHTML = customers.map(c => {
+                    const safePhone = window.app.safeAttr(c.phone);
+                    const safeName = window.app.safeHtml(c.name || '');
+                    const safePhoneDisplay = window.app.safeHtml(c.phone || '');
+                    const safeEmail = window.app.safeHtml(c.email || '-');
+                    return `
+                    <tr class="hover:bg-blue-50 border-b border-gray-100 cursor-pointer" onclick="window.app.openCustomer('${safePhone}')">
+                        <td class="p-4 font-medium">${safeName}</td>
+                        <td class="p-4">${safePhoneDisplay}</td>
+                        <td class="p-4 hidden md:table-cell text-gray-500">${safeEmail}</td>
                         <td class="p-4 text-center"><span class="bg-gray-100 px-2 py-1 rounded-full text-xs font-bold">${c.count}</span></td>
                         <td class="p-4 text-left text-sm text-gray-500">${Utils.formatDate(c.last).split(',')[0]}</td>
                     </tr>
-                `).join('');
+                `;
+                }).join('');
             }
         },
 
@@ -610,16 +717,46 @@ const DB = createDB(sb, Utils);
             window.app.currentCustomer = customer;
 
             const container = document.getElementById('view-customer-detail');
+            if (!container) return;
+            
+            // Sanitize all user data
+            const safeName = window.app.safeHtml(customer.name || '');
+            const safePhone = window.app.safeHtml(customer.phone || '');
+            const safeEmail = customer.email ? window.app.safeHtml(customer.email) : '';
+            const safeNameAttr = window.app.safeAttr(customer.name || '');
+            const safePhoneAttr = window.app.safeAttr(customer.phone || '');
+            const safeEmailAttr = window.app.safeAttr(customer.email || '');
+            
+            const ticketsHtml = tickets.map(t => {
+                const safeTicketId = window.app.safeAttr(t.id);
+                const safeTicketNumber = window.app.safeHtml(t.ticketNumber);
+                const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                const safeIssueDesc = window.app.safeHtml(t.issueDescription || '');
+                return `
+                                <div onclick="window.app.openTicket('${safeTicketId}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${safeTicketNumber}</span><span class="font-medium text-gray-800">${safeBikeModel}</span></div>
+                                        <div class="text-sm text-gray-600 line-clamp-1">${safeIssueDesc}</div>
+                                    </div>
+                                    <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                                        ${window.app.getStatusBadge(t.status)}
+                                        <div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div>
+                                        <i data-lucide="chevron-left" class="w-4 text-gray-300"></i>
+                                    </div>
+                                </div>
+                            `;
+            }).join('');
+            
             container.innerHTML = `
                 <div class="bg-white h-full flex flex-col rounded-lg shadow-lg overflow-hidden">
                      <div class="p-6 border-b flex justify-between items-start bg-gray-50">
                         <div>
-                            <h2 class="text-2xl font-bold text-gray-800">${customer.name}</h2>
+                            <h2 class="text-2xl font-bold text-gray-800">${safeName}</h2>
                             <div class="text-gray-600 flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mt-2">
-                                <span class="flex items-center gap-1"><i data-lucide="phone" class="w-4 text-blue-500"></i> ${customer.phone}</span>
-                                ${customer.email ? `<span class="flex items-center gap-1"><i data-lucide="mail" class="w-4 text-blue-500"></i> ${customer.email}</span>` : ''}
+                                <span class="flex items-center gap-1"><i data-lucide="phone" class="w-4 text-blue-500"></i> ${safePhone}</span>
+                                ${customer.email ? `<span class="flex items-center gap-1"><i data-lucide="mail" class="w-4 text-blue-500"></i> ${safeEmail}</span>` : ''}
                             </div>
-                            <button onclick="window.app.openCreateTicket({name: '${customer.name}', phone: '${customer.phone}', email: '${customer.email || ''}'})" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                            <button onclick="window.app.openCreateTicket({name: '${safeNameAttr}', phone: '${safePhoneAttr}', email: '${safeEmailAttr}'})" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
                                 <i data-lucide="plus" class="w-4 h-4"></i> פתח תיקון חדש ללקוח זה
                             </button>
                         </div>
@@ -630,19 +767,7 @@ const DB = createDB(sb, Utils);
                      <div class="p-6 flex-1 overflow-y-auto bg-gray-50/50">
                         <div class="flex items-center gap-2 mb-4"><i data-lucide="file-text" class="w-5 text-gray-500"></i><h3 class="text-lg font-bold text-gray-700">היסטוריית תיקונים (${tickets.length})</h3></div>
                         <div class="space-y-3">
-                            ${tickets.map(t => `
-                                <div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span><span class="font-medium text-gray-800">${t.bikeModel}</span></div>
-                                        <div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div>
-                                    </div>
-                                    <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                                        ${window.app.getStatusBadge(t.status)}
-                                        <div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div>
-                                        <i data-lucide="chevron-left" class="w-4 text-gray-300"></i>
-                                    </div>
-                                </div>
-                            `).join('')}
+                            ${ticketsHtml}
                         </div>
                      </div>
                 </div>
@@ -666,32 +791,57 @@ const DB = createDB(sb, Utils);
         toggleEditDetails: () => { window.app.isEditingDetails = !window.app.isEditingDetails; window.app.renderTicketDetail(); },
         
         saveTicketDetails: async () => {
-             const container = document.getElementById('view-ticket-detail');
-             const updates = {
-                 customerName: container.querySelector('[data-field="customerName"]').value,
-                 customerPhone: container.querySelector('[data-field="customerPhone"]').value,
-                 customerEmail: container.querySelector('[data-field="customerEmail"]').value,
-                 bikeModel: container.querySelector('[data-field="bikeModel"]').value,
-                 issueDescription: container.querySelector('[data-field="issueDescription"]').value,
-                 tagNumber: container.querySelector('[data-field="tagNumber"]').value
-             };
-             const newHistory = [...(window.app.currentTicket.history || []), { date: new Date().toISOString(), action: 'פרטים עודכנו', user: window.app.user ? window.app.user.email : 'צוות' }];
-             await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
-             window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
-             window.app.isEditingDetails = false;
-             window.app.renderTicketDetail();
-             Utils.showToast("הפרטים עודכנו בהצלחה");
+            try {
+                const container = document.getElementById('view-ticket-detail');
+                if (!container || !window.app.currentTicket) {
+                    Utils.showToast('שגיאה: אין תיקון פתוח', 'error');
+                    return;
+                }
+                const updates = {
+                    customerName: container.querySelector('[data-field="customerName"]')?.value || '',
+                    customerPhone: container.querySelector('[data-field="customerPhone"]')?.value || '',
+                    customerEmail: container.querySelector('[data-field="customerEmail"]')?.value || '',
+                    bikeModel: container.querySelector('[data-field="bikeModel"]')?.value || '',
+                    issueDescription: container.querySelector('[data-field="issueDescription"]')?.value || '',
+                    tagNumber: container.querySelector('[data-field="tagNumber"]')?.value || ''
+                };
+                const newHistory = [...(window.app.currentTicket.history || []), { date: new Date().toISOString(), action: 'פרטים עודכנו', user: window.app.user ? window.app.user.email : 'צוות' }];
+                await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
+                window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
+                window.app.isEditingDetails = false;
+                window.app.renderTicketDetail();
+                Utils.showToast("הפרטים עודכנו בהצלחה");
+            } catch (error) {
+                console.error('Error saving ticket details:', error);
+                Utils.showToast('שגיאה בשמירת הפרטים', 'error');
+            }
         },
         
         addTimelineEntry: async (e) => {
             e.preventDefault();
-            const form = e.target;
-            const newEntry = { id: crypto.randomUUID(), date: new Date().toISOString(), action: form.action.value, notes: form.notes.value, user: window.app.user ? window.app.user.email : 'טכנאי' };
-            const updatedTimeline = [newEntry, ...(window.app.currentTicket.timeline || [])];
-            await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
-            window.app.currentTicket.timeline = updatedTimeline;
-            form.reset();
-            window.app.renderTicketDetail();
+            try {
+                const form = e.target;
+                if (!window.app.currentTicket) {
+                    Utils.showToast('אין תיקון פתוח', 'error');
+                    return;
+                }
+                const newEntry = { 
+                    id: crypto.randomUUID(), 
+                    date: new Date().toISOString(), 
+                    action: form.action.value, 
+                    notes: form.notes.value, 
+                    user: window.app.user ? window.app.user.email : 'טכנאי' 
+                };
+                const updatedTimeline = [newEntry, ...(window.app.currentTicket.timeline || [])];
+                await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
+                window.app.currentTicket.timeline = updatedTimeline;
+                form.reset();
+                window.app.renderTicketDetail();
+                Utils.showToast('הרישום נוסף בהצלחה');
+            } catch (error) {
+                console.error('Error adding timeline entry:', error);
+                Utils.showToast('שגיאה בהוספת רישום', 'error');
+            }
         },
 
         archiveTicket: async () => {
@@ -778,19 +928,45 @@ const DB = createDB(sb, Utils);
         updateQuoteTotal: () => { const items = window.app.currentTicket.quote.items; const total = items.reduce((sum, i) => sum + (i.quantity * i.price), 0); window.app.currentTicket.quote.total = total; const totalEl = document.getElementById('quote-total'); if(totalEl) totalEl.innerText = Utils.formatCurrency(total); },
         addQuoteItem: () => { if(!window.app.currentTicket.quote.items) window.app.currentTicket.quote.items = []; window.app.currentTicket.quote.items.push({ description: '', quantity: 1, price: 0, completed: false }); window.app.renderQuoteItems(); },
         removeQuoteItem: (idx) => { window.app.currentTicket.quote.items.splice(idx, 1); window.app.renderQuoteItems(); },
-        saveQuote: async () => { await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote }); Utils.showToast('השינויים נשמרו'); },
+        saveQuote: async () => {
+            try {
+                if (!window.app.currentTicket) {
+                    Utils.showToast('אין תיקון פתוח', 'error');
+                    return;
+                }
+                await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
+                Utils.showToast('השינויים נשמרו');
+            } catch (error) {
+                console.error('Error saving quote:', error);
+                Utils.showToast('שגיאה בשמירת הצעת המחיר', 'error');
+            }
+        },
         
-        updateStatus: async (newStatus) => { 
-            window.app.currentTicket.status = newStatus;
-            // סנכרון דגל הארכיון אם הסטטוס נבחר ידנית כ'בארכיון'
-            const isArchived = newStatus === 'archived';
-            await DB.update(window.app.currentTicket.id, { 
-                status: newStatus,
-                is_archived: isArchived 
-            }); 
-            window.app.tickets = await DB.getAll(); 
-            window.app.renderTicketDetail(); 
-            Utils.showToast('סטטוס עודכן'); 
+        updateStatus: async (newStatus) => {
+            try {
+                if (!window.app.currentTicket) {
+                    Utils.showToast('אין תיקון פתוח', 'error');
+                    return;
+                }
+                window.app.currentTicket.status = newStatus;
+                // סנכרון דגל הארכיון אם הסטטוס נבחר ידנית כ'בארכיון'
+                const isArchived = newStatus === 'archived';
+                await DB.update(window.app.currentTicket.id, { 
+                    status: newStatus,
+                    is_archived: isArchived 
+                });
+                // Refresh tickets list
+                const requestId = getRequestId();
+                const freshTickets = await DB.getAll();
+                if (requestId === currentRequestId && window.app.user) {
+                    window.app.tickets = freshTickets;
+                }
+                window.app.renderTicketDetail(); 
+                Utils.showToast('סטטוס עודכן');
+            } catch (error) {
+                console.error('Error updating status:', error);
+                Utils.showToast('שגיאה בעדכון הסטטוס', 'error');
+            }
         },
 
         printTicket: () => {
@@ -851,6 +1027,19 @@ const router = {
 };
 
 window.router = router;
+
+// Cleanup on page unload to prevent memory leaks
+window.addEventListener('beforeunload', () => {
+    window.app.cleanup();
+});
+
+// Cleanup on visibility change (when tab is hidden)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        // Optionally pause refresh interval when tab is hidden
+        // The interval already checks visibilityState, so this is just for cleanup
+    }
+});
 
 // Init with DOMContentLoaded
 document.addEventListener("DOMContentLoaded", () => window.app.init());
