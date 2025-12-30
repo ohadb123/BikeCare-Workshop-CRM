@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+	<link rel="icon" href="/favicon.ico">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+	<link rel="manifest" href="/site.webmanifest">
+
+	<title>BikeCare Workshop CRM</title>
+    
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Heebo', sans-serif; background-color: #f3f4f6; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translate(-50%, -100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        .toast {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        th.sortable:hover {
+            background-color: #f3f4f6;
+        }
+        
+        /* Tabs Styling */
+        .tab-btn {
+            padding: 1rem 1.5rem;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: #2563eb;
+            background-color: #f9fafb;
+        }
+        .tab-btn.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+
+        /* Dashboard Cards Hover Effect */
+        .dash-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .dash-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Timeline styling */
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            right: -21px; /* Adjust for RTL */
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #cbd5e1;
+            border: 2px solid #fff;
+        }
+        .timeline-item.active::before {
+            background-color: #2563eb;
+        }
+
+        /* Scrollbar styling for table container */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Login Screen */
+        #login-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background-color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex overflow-hidden">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+            <div class="flex justify-center mb-6 text-blue-600">
+                <i data-lucide="wrench" class="w-16 h-16"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">BikeCare CRM</h1>
+            <p class="text-gray-500 mb-8">מערכת לניהול סדנת אופניים</p>
+            
+            <button onclick="window.app.signInWithGoogle()" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg hover:bg-gray-50 active:bg-gray-100 active:scale-95 transform transition-all shadow-sm cursor-pointer">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
+                התחבר באמצעות Google
+            </button>
+            <p class="text-xs text-gray-400 mt-6">Secure Login via Supabase</p>
+        </div>
+    </div>
+
+    <!-- APP CONTAINER (Initially hidden) -->
+    <div id="app-container" class="flex w-full h-full hidden">
+        <!-- Sidebar -->
+        <aside class="hidden md:flex flex-col w-64 bg-white border-l shadow-sm flex-shrink-0">
+            <div class="p-6 border-b flex items-center gap-2 text-blue-600">
+                <i data-lucide="wrench" class="w-7 h-7"></i>
+                <h1 class="text-xl font-bold tracking-tight">BikeCare CRM</h1>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="router.navigate('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="dashboard">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i> דשבורד
+                </button>
+                <button onclick="router.navigate('tickets')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="tickets">
+                    <i data-lucide="file-text" class="w-5 h-5"></i> תיקונים
+                </button>
+                <button onclick="router.navigate('customers')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="customers">
+                    <i data-lucide="users" class="w-5 h-5"></i> לקוחות
+                </button>
+                <button onclick="router.navigate('secondhand')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="secondhand">
+                    <i data-lucide="bike" class="w-5 h-5"></i> יד שנייה
+                </button>
+                <!-- Archive Link -->
+                <button onclick="router.navigate('archive')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-50 transition" data-target="archive">
+                    <i data-lucide="archive" class="w-5 h-5"></i> ארכיון תיקונים
+                </button>
+            </nav>
+
+            <div class="p-4 border-t">
+                <button onclick="window.app.signOut()" class="w-full flex items-center gap-2 text-gray-500 hover:text-red-600 text-sm p-2 rounded hover:bg-red-50 transition">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> התנתק
+                </button>
+                <div class="text-xs text-gray-400 text-center mt-2">
+                    BikeCare v9.2 (Canvas Mode)
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+            <!-- Mobile Header -->
+            <header class="md:hidden bg-white p-4 shadow-sm flex flex-row-reverse justify-between items-center z-10">
+                <div class="flex items-center gap-2 text-blue-600 font-bold text-lg">
+                    <i data-lucide="wrench" class="w-6 h-6"></i> BikeCare
+                </div>
+                <button onclick="document.querySelector('aside').classList.toggle('hidden'); document.querySelector('aside').classList.toggle('absolute'); document.querySelector('aside').classList.toggle('z-50'); document.querySelector('aside').classList.toggle('h-full');" class="p-2">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </header>
+
+            <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8">
+                
+                <!-- Dashboard View -->
+                <div id="view-dashboard" class="view-section active">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">דשבורד ניהולי</h2>
+                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
+                            <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
+                        </button>
+                    </div>
+
+                    <!-- Section: Repairs -->
+                    <h3 class="text-lg font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                        <i data-lucide="wrench" class="w-5 h-5"></i> תיקונים
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                        <!-- New -->
+                        <div onclick="window.app.filterTicketsByStatus('new')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-blue-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">חדש</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-new">0</div>
+                        </div>
+                        <!-- Waiting Approval -->
+                        <div onclick="window.app.filterTicketsByStatus('waiting_approval')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-purple-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">ממתין לאישור</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-waiting_approval">0</div>
+                        </div>
+                        <!-- In Progress -->
+                        <div onclick="window.app.filterTicketsByStatus('in_progress')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-yellow-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">בטיפול</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-in_progress">0</div>
+                        </div>
+                        <!-- Completed -->
+                        <div onclick="window.app.filterTicketsByStatus('completed')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-green-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">הושלם</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-completed">0</div>
+                        </div>
+                        <!-- Cancelled -->
+                        <div onclick="window.app.filterTicketsByStatus('cancelled')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-gray-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">בוטל</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-cancelled">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Sales & Demo -->
+                    <h3 class="text-lg font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                        <i data-lucide="shopping-bag" class="w-5 h-5"></i> מכירה והדגמה
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+                        <!-- New Bike (Custom Status) -->
+                        <div onclick="window.app.filterTicketsByStatus('new_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-teal-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">אופניים חדשים</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-new_bike">0</div>
+                        </div>
+                        <!-- Test Bike (Custom Status) -->
+                        <div onclick="window.app.filterTicketsByStatus('test_bike')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-orange-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">אופני מבחן</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-test_bike">0</div>
+                        </div>
+                         <!-- Second Hand -->
+                        <div onclick="router.navigate('secondhand')" class="dash-card bg-white p-4 rounded-lg shadow-sm border-r-4 border-indigo-500 h-full flex flex-col justify-between">
+                            <div class="text-gray-500 text-sm mb-1">יד שנייה</div>
+                            <div class="text-2xl font-bold text-gray-800" id="stat-second_hand">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Row for Actionable Table and Pie Chart -->
+                    <div class="flex flex-col md:flex-row gap-6 mb-6">
+                        
+                        <!-- NEW: Actionable Table -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden md:h-[400px] flex-1">
+                            <div class="p-4 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <i data-lucide="alert-circle" class="text-red-500 w-5 h-5"></i> מה דורש טיפול עכשיו
+                                </h3>
+                            </div>
+                            
+                            <div class="overflow-auto custom-scroll flex-1 p-0">
+                                <table class="w-full text-right text-sm border-collapse">
+                                    <thead class="bg-white text-gray-500 sticky top-0 shadow-sm z-10">
+                                        <tr>
+                                            <th class="p-3 border-b font-medium w-1/6">לקוח</th>
+                                            <th class="p-3 border-b font-medium w-1/6">דגם/תיאור</th>
+                                            <th class="p-3 border-b font-medium w-1/6">סטטוס</th>
+                                            <th class="p-3 border-b font-medium w-1/6">ימים מאז שינוי סטטוס</th>
+                                            <th class="p-3 border-b font-medium w-2/6">הנחיה</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="attention-table-body" class="divide-y divide-gray-100">
+                                        <!-- Populated by JS -->
+                                        <tr><td colspan="5" class="p-8 text-center text-gray-500">טוען נתונים...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="p-3 border-t bg-gray-50 text-center shrink-0">
+                                <button onclick="router.navigate('tickets')" class="text-blue-600 hover:underline text-sm font-medium">
+                                    הצג הכל
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Pie Chart Container -->
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:w-1/3 flex flex-col items-center justify-center md:h-[400px]">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4 w-full text-right">התפלגות נתונים</h3>
+                            <div class="w-full h-full flex items-center justify-center relative" style="max-height: 300px;">
+                                <canvas id="dashboard-pie-chart"></canvas>
+                                <div id="no-data-msg" class="absolute inset-0 flex items-center justify-center text-gray-500 hidden">אין נתונים להצגה</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Tickets List View -->
+                <div id="view-tickets" class="view-section">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800">ניהול תיקונים</h2>
+                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4 flex-wrap">
+                        <div class="relative flex-1 min-w-[200px]">
+                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם, מספר או תג..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="filter" class="text-gray-500 w-4 h-4"></i>
+                            <select id="tickets-filter" class="border rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="all">כל הסטטוסים</option>
+                                <option value="new">חדש</option>
+                                <option value="new_bike">אופניים חדשים</option>
+                                <option value="test_bike">אופני מבחן</option>
+                                <option value="in_progress">בטיפול</option>
+                                <option value="waiting_approval">ממתין לאישור</option>
+                                <option value="completed">הושלם</option>
+                                <option value="cancelled">בוטל</option>
+                            </select>
+                            <select id="priority-filter" class="border rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="all">כל הדחיפויות</option>
+                                <option value="normal">רגיל</option>
+                                <option value="high">גבוה</option>
+                                <option value="urgent">דחוף</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="p-4 w-24 sortable" onclick="window.app.handleSort('ticketNumber')">
+                                            <div class="flex items-center gap-1"># <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-ticketNumber"></i></div>
+                                        </th>
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('customerName')">
+                                            <div class="flex items-center gap-1">לקוח <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-customerName"></i></div>
+                                        </th>
+                                        <th class="p-4 hidden md:table-cell">טלפון</th>
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('bikeModel')">
+                                            <div class="flex items-center gap-1">דגם <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-bikeModel"></i></div>
+                                        </th>
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('status')">
+                                            <div class="flex items-center gap-1">סטטוס <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-status"></i></div>
+                                        </th>
+                                        <th class="p-4 hidden md:table-cell sortable" onclick="window.app.handleSort('priority')">
+                                            <div class="flex items-center gap-1">דחיפות <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-priority"></i></div>
+                                        </th>
+                                        <th class="p-4 sortable" onclick="window.app.handleSort('createdAt')">
+                                            <div class="flex items-center gap-1">תאריך <i data-lucide="arrow-up-down" class="w-3 h-3 sort-icon" id="sort-icon-createdAt"></i></div>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tickets-table-body" class="divide-y divide-gray-100">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Ticket View -->
+                <div id="view-create-ticket" class="view-section">
+                    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+                        <div class="flex justify-between items-center mb-6 border-b pb-4">
+                            <h2 class="text-xl font-bold">פתיחת כרטיס תיקון חדש</h2>
+                            <button onclick="router.navigate('tickets')" class="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        
+                        <form id="create-ticket-form" class="space-y-4">
+                            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                 <label class="block text-sm font-bold text-gray-700 mb-1">מספר תיקון (אוטומטי)</label>
+                                 <input name="ticketNumber" type="number" readonly class="w-full border rounded-lg p-2 font-mono text-lg font-bold text-gray-600 bg-gray-100 cursor-not-allowed">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">מספר תג</label>
+                                <input name="tagNumber" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500" placeholder="לדוגמה: 105">
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="relative">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">שם לקוח *</label>
+                                    <input name="customerName" list="customers-datalist" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500" placeholder="התחל להקליד שם לקוח..." oninput="window.app.onCustomerNameInput(this)">
+                                    <datalist id="customers-datalist"></datalist>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">טלפון *</label>
+                                    <input name="customerPhone" required type="tel" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+                                    <input name="customerEmail" type="email" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">דגם אופניים *</label>
+                                    <input name="bikeModel" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500" placeholder="לדוגמה: Trek Marlin 5">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">תיאור התקלה *</label>
+                                <textarea name="issueDescription" required rows="3" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">דחיפות</label>
+                                <select name="priority" class="w-full border rounded-lg p-2">
+                                    <option value="normal">רגיל</option>
+                                    <option value="high">גבוה</option>
+                                    <option value="urgent">דחוף</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">הערות פנימיות</label>
+                                <textarea name="internalNotes" rows="2" class="w-full border rounded-lg p-2 bg-yellow-50 focus:ring-2 focus:ring-yellow-500"></textarea>
+                            </div>
+
+                            <div class="pt-4 flex justify-end gap-3">
+                                <button type="button" onclick="router.navigate('tickets')" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">ביטול</button>
+                                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">פתח כרטיס</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Ticket Detail View -->
+                <div id="view-ticket-detail" class="view-section">
+                    <!-- Content injected by JS -->
+                </div>
+
+                <!-- Customers View -->
+                <div id="view-customers" class="view-section">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">לקוחות</h2>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-4">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="customers-search" placeholder="חיפוש לקוח..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="w-full text-right">
+                            <thead class="bg-gray-50 text-gray-600 border-b">
+                                <tr>
+                                    <th class="p-4">שם לקוח</th>
+                                    <th class="p-4">טלפון</th>
+                                    <th class="p-4 hidden md:table-cell">אימייל</th>
+                                    <th class="p-4 text-center">מס׳ תיקונים</th>
+                                    <th class="p-4">ביקור אחרון</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customers-table-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Customer Detail View -->
+                <div id="view-customer-detail" class="view-section h-full">
+                    <!-- Content injected by JS -->
+                </div>
+                
+                <!-- Archive View -->
+                <div id="view-archive" class="view-section">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800">ארכיון תיקונים</h2>
+                    </div>
+    
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-4">
+                        <div class="relative w-full">
+                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="archive-search" placeholder="חיפוש בארכיון..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="window.app.renderArchive()">
+                        </div>
+                    </div>
+    
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="p-4">#</th>
+                                        <th class="p-4">לקוח</th>
+                                        <th class="p-4">דגם</th>
+                                        <th class="p-4">סטטוס אחרון</th>
+                                        <th class="p-4">תאריך יצירה</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archive-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Hand Bikes View -->
+                <div id="view-secondhand" class="view-section">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">ניהול מלאי אופני יד שנייה</h2>
+                        <button onclick="window.app.openCreateBike()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm font-medium">
+                            <i data-lucide="plus" class="w-4 h-4"></i> אופניים חדשים למלאי
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-center">
+                         <div class="relative flex-1 w-full">
+                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                            <input type="text" id="bike-search" placeholder="חיפוש לפי מותג, דגם או מק״ט..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" oninput="window.app.renderBikes()">
+                        </div>
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <select id="bike-filter-brand" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="window.app.renderBikes()">
+                                <option value="all">כל המותגים</option>
+                            </select>
+                            <select id="bike-filter-size" class="border rounded-lg px-3 py-2 bg-white outline-none text-sm w-full" onchange="window.app.renderBikes()">
+                                <option value="all">כל המידות</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right">
+                                <thead class="bg-gray-50 text-gray-600 border-b">
+                                    <tr>
+                                        <th class="p-4">מותג</th>
+                                        <th class="p-4">דגם</th>
+                                        <th class="p-4 hidden md:table-cell">שנה / צבע</th>
+                                        <th class="p-4">מידה</th>
+                                        <th class="p-4">מחיר</th>
+                                        <th class="p-4 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bikes-table-body" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bike Detail/Edit View -->
+                <div id="view-bike-detail" class="view-section">
+                     <div class="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+                        <div class="flex justify-between items-center mb-6 border-b pb-4">
+                            <h2 class="text-xl font-bold" id="bike-form-title">כרטיס אופני יד שנייה</h2>
+                            <button onclick="router.navigate('secondhand')" class="text-gray-500 hover:bg-gray-100 p-2 rounded-full">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        
+                        <form id="bike-form" class="space-y-4">
+                            <input type="hidden" name="id">
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מותג *</label>
+                                    <input name="brand" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">דגם *</label>
+                                    <input name="model" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מחיר סופי *</label>
+                                    <input name="price" type="number" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 font-bold text-green-700">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">גודל גלגל</label>
+                                    <input name="wheelSize" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מידה</label>
+                                    <input name="size" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">צבע</label>
+                                    <input name="color" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">תרכובת שלדה</label>
+                                    <select name="frameMaterial" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                        <option value="">- בחר -</option>
+                                        <option value="אלומיניום">אלומיניום</option>
+                                        <option value="קרבון">קרבון</option>
+                                        <option value="פלדה">פלדה</option>
+                                        <option value="טיטניום">טיטניום</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">מק״ט בקופה</label>
+                                    <input name="sku" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+
+                            <div class="border-t pt-4 mt-4">
+                                <h4 class="text-sm font-bold text-gray-500 mb-3">מפרט טכני נוסף (אופציונלי)</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">גודל סוללה</label>
+                                        <input name="battery" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">מנוע</label>
+                                        <input name="motor" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">מהלך בולם קדמי (מ״מ)</label>
+                                        <input name="frontTravel" type="number" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">מהלך מתלה אחורי (מ״מ)</label>
+                                        <input name="rearTravel" type="number" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-6 flex justify-between items-center">
+                                <button type="button" id="btn-delete-bike" onclick="window.app.deleteBike()" class="text-red-600 hover:bg-red-50 px-4 py-2 rounded hidden">
+                                    <i data-lucide="trash-2" class="w-4 h-4 inline"></i> מחק פריט
+                                </button>
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="router.navigate('secondhand')" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">ביטול</button>
+                                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">שמור אופניים</button>
+                                </div>
+                            </div>
+                        </form>
+                     </div>
+                </div>
+
+            </div> <!-- End Content Area -->
+        </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50"></div>
+
+<script type="module" src="/src/main.js"></script>
+
+</body>
+</html>
