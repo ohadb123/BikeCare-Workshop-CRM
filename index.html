@@ -119,6 +119,22 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Chart.js Legend - Prevent hover text color/opacity changes */
+        .chartjs-legend,
+        .chartjs-legend li,
+        .chartjs-legend li span {
+            color: #374151 !important; /* gray-700 */
+            opacity: 1 !important;
+        }
+        .chartjs-legend:hover,
+        .chartjs-legend:hover li,
+        .chartjs-legend:hover li span,
+        .chartjs-legend li:hover,
+        .chartjs-legend li:hover span {
+            color: #374151 !important; /* gray-700 */
+            opacity: 1 !important;
+        }
     </style>
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">

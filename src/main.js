@@ -407,6 +407,7 @@ const DB = createDB(sb, Utils);
                                 position: 'right',
                                 labels: {
                                     font: { family: 'Heebo', size: 11 },
+                                    color: '#374151', // gray-700 - explicit color to prevent hover overrides
                                     boxWidth: 10,
                                     generateLabels: (chart) => {
                                         const data = chart.data;
