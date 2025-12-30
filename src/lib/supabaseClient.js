@@ -1,10 +1,16 @@
-export const supabaseUrl = 'https://czxicysnfwvxapipzysg.supabase.co';
-export const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6eGljeXNuZnd2eGFwaXB6eXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNDY3MTYsImV4cCI6MjA4MDYyMjcxNn0.cgk7AxkRzkptv0lzj-63J2vBqj1dqB3OCk5qeq9BQqo';
+import { createClient } from "@supabase/supabase-js";
 
-export function createSupabaseClient() {
-  if (!window.supabase) {
-    console.error("Supabase CDN not loaded. Ensure the Supabase script tag exists in index.html");
-    return null;
-  }
-  return window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing env vars: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY");
 }
+
+// Keep the function your app imports
+export function createSupabaseClient() {
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
+
+// Optional: also export a singleton for convenience
+export const supabase = createSupabaseClient();
