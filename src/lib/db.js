@@ -28,7 +28,7 @@ export function createDB(sb, Utils) {
     // NOTE: tagNumber is NOT accepted - frontend must use tagnumber
     const fieldMappings = {
       // Accept camelCase input (EXCEPT tagNumber - use tagnumber instead)
-      ticketNumber: 'ticketnumber',
+      ticketnumber: 'ticketnumber',
       customerName: 'customername',
       customerPhone: 'customerphone',
       customerEmail: 'customeremail',
@@ -160,8 +160,8 @@ export function createDB(sb, Utils) {
     if (formState.tagnumber !== undefined && VALID_DB_COLUMNS.has('tagnumber')) {
       payload.tagnumber = formState.tagnumber;
     }
-    if (formState.ticketNumber !== undefined && VALID_DB_COLUMNS.has('ticketnumber')) {
-      payload.ticketnumber = formState.ticketNumber;
+    if (formState.ticketnumber !== undefined && VALID_DB_COLUMNS.has('ticketnumber')) {
+      payload.ticketnumber = formState.ticketnumber;
     }
     if (formState.customerName !== undefined && VALID_DB_COLUMNS.has('customername')) {
       payload.customername = formState.customerName;
@@ -265,7 +265,7 @@ export function createDB(sb, Utils) {
     return {
       ...dbRow,
       tagnumber: dbRow.tagnumber,
-      ticketNumber: dbRow.ticketnumber,
+      ticketnumber: dbRow.ticketnumber,
       customerName: dbRow.customername,
       customerPhone: dbRow.customerphone,
       customerEmail: dbRow.customeremail,
