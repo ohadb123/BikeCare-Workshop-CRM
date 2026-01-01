@@ -1,9 +1,6 @@
-import { createSupabaseClient } from './lib/supabaseClient.js';
+import { supabase as sb } from './lib/supabaseClient.js';
 import { createDB, BikeDB } from './lib/db.js';
 import { Utils } from './lib/utils.js';
-
-    // --- הגדרות Supabase ---
-const sb = createSupabaseClient();
 
   // --- Utils ---
 const DB = createDB(sb, Utils);
@@ -188,13 +185,13 @@ const DB = createDB(sb, Utils);
                                 }
                             }
                         } catch (error) {
-                            console.error('Error refreshing data:', error);
+                            console.error('Error refreshing data:', error.message || error, error.details || '');
                             // Don't show toast on every refresh error to avoid spam
                         }
                     }
                 }, 10000);
             } catch (error) {
-                console.error('Error starting app:', error);
+                console.error('Error starting app:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בהפעלת האפליקציה', 'error');
                 window.app.started = false;
             }
@@ -275,7 +272,7 @@ const DB = createDB(sb, Utils);
                     Utils.showToast('כרטיס נפתח בהצלחה');
                     router.navigate('tickets');
                 } catch(err) {
-                    console.error('Error creating ticket:', err);
+                    console.error('Error creating ticket:', err.message || err, err.details || '');
                     Utils.showToast('שגיאה בפתיחת כרטיס', 'error');
                 }
             };
@@ -812,7 +809,7 @@ const DB = createDB(sb, Utils);
                 window.app.renderTicketDetail();
                 Utils.showToast("הפרטים עודכנו בהצלחה");
             } catch (error) {
-                console.error('Error saving ticket details:', error);
+                console.error('Error saving ticket details:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בשמירת הפרטים', 'error');
             }
         },
@@ -839,7 +836,7 @@ const DB = createDB(sb, Utils);
                 window.app.renderTicketDetail();
                 Utils.showToast('הרישום נוסף בהצלחה');
             } catch (error) {
-                console.error('Error adding timeline entry:', error);
+                console.error('Error adding timeline entry:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בהוספת רישום', 'error');
             }
         },
@@ -937,7 +934,7 @@ const DB = createDB(sb, Utils);
                 await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
                 Utils.showToast('השינויים נשמרו');
             } catch (error) {
-                console.error('Error saving quote:', error);
+                console.error('Error saving quote:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בשמירת הצעת המחיר', 'error');
             }
         },
@@ -964,7 +961,7 @@ const DB = createDB(sb, Utils);
                 window.app.renderTicketDetail(); 
                 Utils.showToast('סטטוס עודכן');
             } catch (error) {
-                console.error('Error updating status:', error);
+                console.error('Error updating status:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בעדכון הסטטוס', 'error');
             }
         },

@@ -60,7 +60,7 @@ export function createDB(sb, Utils) {
           .order('createdAt', { ascending: false });
 
         if (error) {
-          console.error("Supabase Error:", error);
+          console.error("Supabase Error:", error.message || error, error.details || '');
           Utils.showToast("שגיאה בטעינת הנתונים", "error");
           return [];
         }
@@ -73,7 +73,7 @@ export function createDB(sb, Utils) {
           quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
         }));
       } catch (e) {
-        console.error("DB Connection Error:", e);
+        console.error("DB Connection Error:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בחיבור למסד הנתונים", "error");
         return [];
       }
@@ -95,14 +95,14 @@ export function createDB(sb, Utils) {
         const { data, error } = await sb.from('tickets').insert([newTicket]).select().single();
 
         if (error) {
-          console.error("Error saving ticket:", error);
+          console.error("Error saving ticket:", error.message || error, error.details || '');
           Utils.showToast("שגיאה בשמירה", "error");
           throw error;
         }
 
         return data || newTicket;
       } catch (e) {
-        console.error("Failed to add ticket:", e);
+        console.error("Failed to add ticket:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בשמירת התיקון", "error");
         throw e;
       }
@@ -123,14 +123,14 @@ export function createDB(sb, Utils) {
           .single();
 
         if (error) {
-          console.error("Update Error:", error);
+          console.error("Update Error:", error.message || error, error.details || '');
           Utils.showToast("שגיאה בעדכון", "error");
           throw error;
         }
 
         return data;
       } catch (e) {
-        console.error("Failed to update ticket:", e);
+        console.error("Failed to update ticket:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בעדכון התיקון", "error");
         throw e;
       }
