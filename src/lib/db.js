@@ -21,8 +21,8 @@ export function createDB(sb, Utils) {
     
     // Map camelCase to lowercase column names - ONLY include if column exists in DB
     // NOTE: Only map fields that exist in VALID_DB_COLUMNS
-    if (formState.tagNumber !== undefined && VALID_DB_COLUMNS.has('tagnumber')) {
-      payload.tagnumber = formState.tagNumber;
+    if (formState.tagnumber !== undefined && VALID_DB_COLUMNS.has('tagnumber')) {
+      payload.tagnumber = formState.tagnumber;
     }
     if (formState.ticketNumber !== undefined && VALID_DB_COLUMNS.has('ticketnumber')) {
       payload.ticketnumber = formState.ticketNumber;
@@ -128,7 +128,7 @@ export function createDB(sb, Utils) {
     
     return {
       ...dbRow,
-      tagNumber: dbRow.tagnumber,
+      tagnumber: dbRow.tagnumber,
       ticketNumber: dbRow.ticketnumber,
       customerName: dbRow.customername,
       customerPhone: dbRow.customerphone,
@@ -190,7 +190,7 @@ export function createDB(sb, Utils) {
           // Migration: extras are already in localStorage, no need to update Supabase
           // Just keep them in localStorage (they're not columns in Supabase)
           // This migration function can be simplified or removed
-          if (extras.history || extras.timeline || extras.tagNumber !== undefined) {
+          if (extras.history || extras.timeline || extras.tagnumber !== undefined) {
             // Extras are already stored correctly in localStorage, no action needed
             console.log(`Keeping extras for ticket ${ticketId} in localStorage`);
           }
@@ -268,14 +268,14 @@ export function createDB(sb, Utils) {
         }
 
         // Map DB lowercase columns to camelCase frontend format
-        // Merge with localStorage extras (timeline, tagNumber)
+        // Merge with localStorage extras (timeline, tagnumber)
         return (data || []).map(dbRow => {
           const ticket = mapDbToFrontend(dbRow);
           const extras = JSON.parse(localStorage.getItem(`ticket_extras_${ticket.id}`) || '{}');
           return {
             ...ticket,
             timeline: extras.timeline || [],
-            tagNumber: extras.tagNumber !== undefined ? extras.tagNumber : (ticket.tagNumber || null),
+            tagnumber: extras.tagnumber !== undefined ? extras.tagnumber : (ticket.tagnumber || null),
             quote: ticket.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
           };
         });
@@ -297,7 +297,7 @@ export function createDB(sb, Utils) {
         Object.keys(ticketForDb).forEach(key => {
           // Only pass known camelCase fields that will be mapped
           // Don't pass through any unknown fields
-          if (['tagNumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
+          if (['tagnumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
                'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
                'is_archived', 'history', 'quote', 'id', 'createdAt', 'updatedAt'].includes(key)) {
             cleanTicket[key] = ticketForDb[key];
@@ -342,7 +342,7 @@ export function createDB(sb, Utils) {
         // Store timeline in localStorage (it doesn't exist in DB)
         const extras = {
           timeline: timeline || [],
-          tagNumber: data.tagnumber || null
+          tagnumber: data.tagnumber || null
         };
         localStorage.setItem(`ticket_extras_${data.id}`, JSON.stringify(extras));
 
@@ -351,7 +351,7 @@ export function createDB(sb, Utils) {
         return {
           ...mappedTicket,
           timeline: extras.timeline,
-          tagNumber: extras.tagNumber
+          tagnumber: extras.tagnumber
         };
       } catch (e) {
         console.error("Failed to add ticket:", e.message || e, e.details || '');
@@ -378,7 +378,7 @@ export function createDB(sb, Utils) {
         Object.keys(updatesForDb).forEach(key => {
           // Only pass known camelCase fields that will be mapped
           // Don't pass through any unknown fields
-          if (['tagNumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
+          if (['tagnumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
                'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
                'is_archived', 'history', 'quote'].includes(key)) {
             cleanUpdates[key] = updatesForDb[key];
@@ -473,7 +473,7 @@ export function createDB(sb, Utils) {
         const existingExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
         const newExtras = {
           timeline: timeline !== undefined ? timeline : (existingExtras.timeline || []),
-          tagNumber: data.tagnumber || existingExtras.tagNumber || null
+          tagnumber: data.tagnumber || existingExtras.tagnumber || null
         };
         
         // Update localStorage if timeline was provided
@@ -486,7 +486,7 @@ export function createDB(sb, Utils) {
         return {
           ...mappedTicket,
           timeline: newExtras.timeline,
-          tagNumber: newExtras.tagNumber
+          tagnumber: newExtras.tagnumber
         };
       } catch (e) {
         console.error("Failed to update ticket:", e.message || e, e.details || '');
