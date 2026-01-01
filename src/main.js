@@ -247,15 +247,15 @@ const DB = createDB(sb, Utils);
                         return;
                     }
                     
-                    if (data.ticketnumber) {
-                        data.ticketnumber = parseInt(data.ticketnumber);
+                    if (data.ticketNumber) {
+                        data.ticketNumber = parseInt(data.ticketNumber);
                     }
                     
-                    const nextId = window.app.getNextticketnumber();
+                    const nextId = window.app.getNextticketNumber();
                     
                     await DB.add({
                         ...data,
-                        ticketnumber: nextId,
+                        ticketNumber: nextId,
                         status: 'new',
                         quote: { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false },
                         timeline: [],
@@ -315,7 +315,7 @@ const DB = createDB(sb, Utils);
             return Array.from(custMap.values());
         },
 
-        onCustomerNameInput: (input) => {
+        oncustomerNameInput: (input) => {
             const val = input.value;
             const customers = window.app.getCustomers();
             const found = customers.find(c => c.name === val);
@@ -328,8 +328,8 @@ const DB = createDB(sb, Utils);
             }
         },
 
-        getNextticketnumber: () => {
-            const numbers = window.app.tickets.map(t => parseInt(t.ticketnumber) || 0);
+        getNextticketNumber: () => {
+            const numbers = window.app.tickets.map(t => parseInt(t.ticketNumber) || 0);
             const max = numbers.length > 0 ? Math.max(...numbers) : 0;
             return Math.max(max + 1, 2400);
         },
@@ -354,8 +354,8 @@ const DB = createDB(sb, Utils);
             const form = document.getElementById('create-ticket-form');
             if(form) {
                  form.reset();
-                 const nextId = window.app.getNextticketnumber();
-                 form.querySelector('[name="ticketnumber"]').value = nextId;
+                 const nextId = window.app.getNextticketNumber();
+                 form.querySelector('[name="ticketNumber"]').value = nextId;
 
                  const datalist = document.getElementById('customers-datalist');
                  if(datalist) {
@@ -546,12 +546,12 @@ const DB = createDB(sb, Utils);
                     const actionText = ACTION_TEXTS[ticket.status] || 'יש לבדוק סטטוס';
                     const dayColorClass = window.app.getDaysColor(ticket.diffDays);
                     const safeId = window.app.safeAttr(ticket.id);
-                    const safeCustomerName = window.app.safeHtml(ticket.customerName || '');
-                    const safeBikeModel = window.app.safeHtml(ticket.bikeModel || '');
+                    const safecustomerName = window.app.safeHtml(ticket.customerName || '');
+                    const safebikeModel = window.app.safeHtml(ticket.bikeModel || '');
                     return `
                     <tr class="hover:bg-blue-50 border-b border-gray-50 cursor-pointer" onclick="window.app.openTicket('${safeId}')">
-                        <td class="p-3 text-gray-800 font-medium">${safeCustomerName}</td>
-                        <td class="p-3 text-gray-600">${safeBikeModel}</td>
+                        <td class="p-3 text-gray-800 font-medium">${safecustomerName}</td>
+                        <td class="p-3 text-gray-600">${safebikeModel}</td>
                         <td class="p-3">${window.app.getStatusBadge(ticket.status)}</td>
                         <td class="p-3 text-center">
                             <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ${dayColorClass}">
@@ -576,7 +576,7 @@ const DB = createDB(sb, Utils);
             let filtered = window.app.tickets.filter(t => {
                 if (t.is_archived) return false;
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
-                                    (t.ticketnumber || '').toString().includes(search) || 
+                                    (t.ticketNumber || '').toString().includes(search) || 
                                     (t.bikeModel || '').toLowerCase().includes(search) ||
                                     (t.tagnumber || '').toString().includes(search);
                 const matchFilter = filter === 'all' || t.status === filter;
@@ -614,16 +614,16 @@ const DB = createDB(sb, Utils);
 
             tbody.innerHTML = filtered.map(t => {
                 const safeId = window.app.safeAttr(t.id);
-                const safeticketnumber = window.app.safeHtml(t.ticketnumber);
-                const safeCustomerName = window.app.safeHtml(t.customerName || '');
-                const safeCustomerPhone = window.app.safeHtml(t.customerPhone || '');
-                const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                const safeticketNumber = window.app.safeHtml(t.ticketNumber);
+                const safecustomerName = window.app.safeHtml(t.customerName || '');
+                const safecustomerPhone = window.app.safeHtml(t.customerPhone || '');
+                const safebikeModel = window.app.safeHtml(t.bikeModel || '');
                 return `
                 <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
-                    <td class="p-4 font-mono font-bold text-blue-600">#${safeticketnumber}</td>
-                    <td class="p-4 font-medium">${safeCustomerName}</td>
-                    <td class="p-4 hidden md:table-cell text-gray-600">${safeCustomerPhone}</td>
-                    <td class="p-4 text-gray-800">${safeBikeModel}</td>
+                    <td class="p-4 font-mono font-bold text-blue-600">#${safeticketNumber}</td>
+                    <td class="p-4 font-medium">${safecustomerName}</td>
+                    <td class="p-4 hidden md:table-cell text-gray-600">${safecustomerPhone}</td>
+                    <td class="p-4 text-gray-800">${safebikeModel}</td>
                     <td class="p-4">${window.app.getStatusBadge(t.status)}</td>
                     <td class="p-4 hidden md:table-cell">${window.app.getPriorityLabel(t.priority)}</td>
                     <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdAt)}</td>
@@ -638,7 +638,7 @@ const DB = createDB(sb, Utils);
             let filtered = window.app.tickets.filter(t => {
                 const isArchived = t.is_archived === true;
                 const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
-                                    (t.ticketnumber || '').toString().includes(search) || 
+                                    (t.ticketNumber || '').toString().includes(search) || 
                                     (t.bikeModel || '').toLowerCase().includes(search);
                 return isArchived && matchSearch;
             });
@@ -649,14 +649,14 @@ const DB = createDB(sb, Utils);
             } else {
                 tbody.innerHTML = filtered.map(t => {
                     const safeId = window.app.safeAttr(t.id);
-                    const safeticketnumber = window.app.safeHtml(t.ticketnumber);
-                    const safeCustomerName = window.app.safeHtml(t.customerName || '');
-                    const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                    const safeticketNumber = window.app.safeHtml(t.ticketNumber);
+                    const safecustomerName = window.app.safeHtml(t.customerName || '');
+                    const safebikeModel = window.app.safeHtml(t.bikeModel || '');
                     return `
                     <tr class="hover:bg-gray-50 border-b border-gray-100 cursor-pointer text-gray-500" onclick="window.app.openTicket('${safeId}')">
-                        <td class="p-4 font-mono">#${safeticketnumber}</td>
-                        <td class="p-4">${safeCustomerName}</td>
-                        <td class="p-4">${safeBikeModel}</td>
+                        <td class="p-4 font-mono">#${safeticketNumber}</td>
+                        <td class="p-4">${safecustomerName}</td>
+                        <td class="p-4">${safebikeModel}</td>
                         <td class="p-4 text-xs">${window.app.getStatusBadge(t.status)}</td>
                         <td class="p-4 text-sm">${Utils.formatDate(t.createdAt)}</td>
                     </tr>
@@ -727,13 +727,13 @@ const DB = createDB(sb, Utils);
             
             const ticketsHtml = tickets.map(t => {
                 const safeTicketId = window.app.safeAttr(t.id);
-                const safeticketnumber = window.app.safeHtml(t.ticketnumber);
-                const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                const safeticketNumber = window.app.safeHtml(t.ticketNumber);
+                const safebikeModel = window.app.safeHtml(t.bikeModel || '');
                 const safeIssueDesc = window.app.safeHtml(t.issueDescription || '');
                 return `
                                 <div onclick="window.app.openTicket('${safeTicketId}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4">
                                     <div class="flex-1">
-                                        <div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${safeticketnumber}</span><span class="font-medium text-gray-800">${safeBikeModel}</span></div>
+                                        <div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${safeticketNumber}</span><span class="font-medium text-gray-800">${safebikeModel}</span></div>
                                         <div class="text-sm text-gray-600 line-clamp-1">${safeIssueDesc}</div>
                                     </div>
                                     <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
@@ -927,9 +927,9 @@ const DB = createDB(sb, Utils);
             const timeline = ticket.timeline || [];
             const detailsContent = `<div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">הצעת מחיר וטיפול</h3><div class="flex gap-2"><button onclick="window.app.printTicket()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="printer" class="w-4"></i> הדפס</button><button onclick="window.app.saveQuote()" class="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded flex items-center gap-1"><i data-lucide="save" class="w-4"></i> שמור</button></div></div><div class="bg-white border rounded-lg overflow-hidden mb-6"><table class="w-full text-right text-sm" id="quote-table"><thead class="bg-gray-50 border-b"><tr><th class="p-3 w-10 text-center">בוצע</th><th class="p-3">תיאור</th><th class="p-3 w-20">כמות</th><th class="p-3 w-24">מחיר</th><th class="p-3 w-24">סה״כ</th><th class="p-3 w-10"></th></tr></thead><tbody id="quote-items-body"></tbody><tfoot class="bg-gray-50"><tr><td colspan="6" class="p-2 text-center"><button onclick="window.app.addQuoteItem()" class="text-blue-600 hover:underline"><i data-lucide="plus" class="w-3 inline"></i> הוסף שורה</button></td></tr></tfoot></table><div class="p-4 border-t bg-gray-50 flex justify-between items-center font-bold text-lg"><span>סה״כ לתשלום:</span><span id="quote-total">0.00 ₪</span></div></div>`;
             const timelineContent = `<div class="bg-white p-4 rounded-lg border mb-4"><h4 class="font-bold mb-3">הוסף תיעוד חדש</h4><form onsubmit="window.app.addTimelineEntry(event)" class="space-y-3"><div class="flex gap-2"><select name="action" class="border rounded p-2 text-sm w-1/3"><option>בדיקה ראשונית</option><option>המתנה לחלקים</option><option>ביצוע תיקון</option><option>בדיקת איכות</option><option>סיום טיפול</option><option>יצירת קשר עם לקוח</option></select><input name="notes" placeholder="פרט מה בוצע, תוצאות או הערות..." class="border rounded p-2 text-sm flex-1" required></div><div class="flex justify-end"><button type="submit" class="bg-blue-600 text-white px-4 py-1 rounded text-sm hover:bg-blue-700">הוסף ליומן</button></div></form></div><div class="relative border-r-2 border-gray-200 mr-3 space-y-6">${timeline.map((item, idx) => `<div class="timeline-item ${idx === 0 ? 'active' : ''} mr-6 relative"><div class="text-xs text-gray-500 mb-1 flex justify-between"><span>${Utils.formatDate(item.date)}</span><span class="font-bold">${item.user || 'מערכת'}</span></div><div class="bg-white p-3 rounded border shadow-sm"><div class="font-bold text-blue-700 text-sm mb-1">${item.action}</div><div class="text-sm text-gray-700">${item.notes}</div></div></div>`).join('')}${timeline.length === 0 ? '<div class="mr-6 text-gray-400 text-sm">אין רישומים ביומן עדיין.</div>' : ''}</div>`;
-            const historyContent = `<div class="space-y-3 mt-4">${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}${customerHistory.map(t => `<div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4"><div class="flex-1"><div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${t.ticketnumber}</span><span class="font-medium text-gray-800">${t.bikeModel}</span></div><div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div></div><div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">${window.app.getStatusBadge(t.status)}<div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div></div></div>`).join('')}</div>`;
+            const historyContent = `<div class="space-y-3 mt-4">${customerHistory.length === 0 ? '<div class="text-center text-gray-500 p-8">אין היסטוריה נוספת ללקוח זה</div>' : ''}${customerHistory.map(t => `<div onclick="window.app.openTicket('${t.id}')" class="bg-white border p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md cursor-pointer transition gap-4"><div class="flex-1"><div class="flex items-center gap-2 mb-1"><span class="font-mono text-blue-600 font-bold">#${t.ticketNumber}</span><span class="font-medium text-gray-800">${t.bikeModel}</span></div><div class="text-sm text-gray-600 line-clamp-1">${t.issueDescription}</div></div><div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">${window.app.getStatusBadge(t.status)}<div class="text-xs text-gray-500 flex items-center gap-1"><i data-lucide="calendar" class="w-3"></i>${Utils.formatDate(t.createdAt).split(',')[0]}</div></div></div>`).join('')}</div>`;
             const renderInput = (field, value) => window.app.isEditingDetails ? `<input data-field="${field}" value="${value || ''}" class="w-full border rounded px-2 py-1 text-sm bg-white focus:ring-2 focus:ring-blue-200">` : `<div class="text-gray-800 font-medium">${value || '-'}</div>`;
-            container.innerHTML = `<div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg"><div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto flex flex-col"><div class="flex justify-between items-start mb-6"><div><h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">תיקון #${ticket.ticketnumber}${ticket.tagnumber ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full border border-yellow-200">תג: ${ticket.tagnumber}</span>` : ''}</h2><div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div></div><div class="flex gap-2"><button onclick="window.app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${window.app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}"><i data-lucide="${window.app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i></button><button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button></div></div><div class="mb-6"><label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label><div class="flex flex-wrap gap-2">${Object.entries(STATUSES).map(([k, v]) => `<button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>`).join('')}</div></div><div class="space-y-4 flex-1"><div class="bg-white p-4 rounded border relative group"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">שם:</span> ${renderInput('customerName', ticket.customerName)}</div><div><span class="text-gray-400 text-xs">טלפון:</span> ${renderInput('customerPhone', ticket.customerPhone)}</div><div><span class="text-gray-400 text-xs">אימייל:</span> ${renderInput('customerEmail', ticket.customerEmail)}</div></div></div><div class="bg-white p-4 rounded border mb-4"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="tag" class="w-4"></i> מספר תג</h3><div class="space-y-2 text-sm">${renderInput('tagnumber', ticket.tagnumber)}</div></div><div class="bg-white p-4 rounded border"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div><div><span class="text-gray-400 text-xs">תקלה:</span>${window.app.isEditingDetails ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>` : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`}</div></div></div>${window.app.isEditingDetails ? `<button onclick="window.app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4"><i data-lucide="save" class="w-4"></i> שמור שינויים</button>` : ''}<div class="mt-8 border-t pt-4"><button onclick="window.app.archiveTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"><i data-lucide="archive" class="w-4 h-4"></i> העבר לארכיון</button></div></div></div><div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden"><div class="flex border-b bg-gray-50"><button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button><button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button><button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button></div><div class="p-6 overflow-y-auto h-full">${window.app.activeTicketTab === 'details' ? detailsContent : window.app.activeTicketTab === 'timeline' ? timelineContent : historyContent}</div></div></div>`;
+            container.innerHTML = `<div class="bg-white h-full flex flex-col md:flex-row overflow-hidden rounded-lg shadow-lg"><div class="w-full md:w-1/3 bg-gray-50 border-l p-6 overflow-y-auto flex flex-col"><div class="flex justify-between items-start mb-6"><div><h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">תיקון #${ticket.ticketNumber}${ticket.tagnumber ? `<span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full border border-yellow-200">תג: ${ticket.tagnumber}</span>` : ''}</h2><div class="text-sm text-gray-500">${Utils.formatDate(ticket.createdAt)}</div></div><div class="flex gap-2"><button onclick="window.app.toggleEditDetails()" class="text-gray-500 hover:text-blue-600 p-1 rounded hover:bg-gray-200" title="${window.app.isEditingDetails ? 'בטל עריכה' : 'ערוך פרטים'}"><i data-lucide="${window.app.isEditingDetails ? 'x' : 'pencil'}" class="w-5 h-5"></i></button><button onclick="router.navigate('tickets')" class="text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button></div></div><div class="mb-6"><label class="block text-sm font-medium text-gray-500 mb-2">סטטוס</label><div class="flex flex-wrap gap-2">${Object.entries(STATUSES).map(([k, v]) => `<button onclick="window.app.updateStatus('${k}')" class="px-3 py-1 text-xs rounded-full border transition ${ticket.status === k ? v.color + ' ring-2 ring-blue-300' : 'bg-white text-gray-600'}">${v.label}</button>`).join('')}</div></div><div class="space-y-4 flex-1"><div class="bg-white p-4 rounded border relative group"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="user" class="w-4"></i> פרטי לקוח</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">שם:</span> ${renderInput('customerName', ticket.customerName)}</div><div><span class="text-gray-400 text-xs">טלפון:</span> ${renderInput('customerPhone', ticket.customerPhone)}</div><div><span class="text-gray-400 text-xs">אימייל:</span> ${renderInput('customerEmail', ticket.customerEmail)}</div></div></div><div class="bg-white p-4 rounded border mb-4"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="tag" class="w-4"></i> מספר תג</h3><div class="space-y-2 text-sm">${renderInput('tagnumber', ticket.tagnumber)}</div></div><div class="bg-white p-4 rounded border"><h3 class="font-semibold text-gray-700 flex items-center gap-2 mb-3"><i data-lucide="wrench" class="w-4"></i> פרטי אופניים</h3><div class="space-y-2 text-sm"><div><span class="text-gray-400 text-xs">דגם:</span> ${renderInput('bikeModel', ticket.bikeModel)}</div><div><span class="text-gray-400 text-xs">תקלה:</span>${window.app.isEditingDetails ? `<textarea data-field="issueDescription" class="w-full border rounded px-2 py-1 text-sm h-20">${ticket.issueDescription}</textarea>` : `<div class="bg-gray-50 p-2 rounded text-gray-700 mt-1">${ticket.issueDescription}</div>`}</div></div></div>${window.app.isEditingDetails ? `<button onclick="window.app.saveTicketDetails()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 mt-4"><i data-lucide="save" class="w-4"></i> שמור שינויים</button>` : ''}<div class="mt-8 border-t pt-4"><button onclick="window.app.archiveTicket()" class="w-full flex items-center justify-center gap-2 p-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors"><i data-lucide="archive" class="w-4 h-4"></i> העבר לארכיון</button></div></div></div><div class="w-full md:w-2/3 bg-white flex flex-col overflow-hidden"><div class="flex border-b bg-gray-50"><button onclick="window.app.switchTicketTab('details')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'details' ? 'active' : ''}">הצעת מחיר וטיפול</button><button onclick="window.app.switchTicketTab('timeline')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'timeline' ? 'active' : ''}">יומן טיפול (Story)</button><button onclick="window.app.switchTicketTab('history')" class="tab-btn flex-1 ${window.app.activeTicketTab === 'history' ? 'active' : ''}">היסטוריית לקוח</button></div><div class="p-6 overflow-y-auto h-full">${window.app.activeTicketTab === 'details' ? detailsContent : window.app.activeTicketTab === 'timeline' ? timelineContent : historyContent}</div></div></div>`;
             lucide.createIcons();
             if(window.app.activeTicketTab === 'details') { window.app.renderQuoteItems(); }
         },
@@ -1011,7 +1011,7 @@ const DB = createDB(sb, Utils);
             const ticket = window.app.currentTicket; const printWindow = window.open('', '_blank');
             const items = ticket.quote.items || []; const subtotal = items.reduce((sum, i) => sum + (i.quantity * i.price), 0);
             const discount = ticket.quote.discount || 0; const total = subtotal - discount;
-            const html = `<html dir="rtl"><head><title>הצעת מחיר - תיקון #${ticket.ticketnumber}</title><style>body { font-family: 'Heebo', sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }.header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }.logo { font-size: 24px; font-weight: bold; color: #2563eb; }.meta { text-align: left; font-size: 14px; color: #666; }.title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }.grid-container { display: flex; gap: 40px; margin-bottom: 30px; }.col { flex: 1; }.section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }.row { margin-bottom: 5px; font-size: 14px; }.label { font-weight: 500; color: #555; }table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }th { text-align: right; background: #f9fafb; padding: 10px; font-size: 14px; border-bottom: 1px solid #ddd; }td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }.totals { margin-top: 0; margin-left: 0; margin-right: auto; width: 300px; }.total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }.grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; margin-top: 10px; padding-top: 10px; }.footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }@media print { body { padding: 0; } button { display: none; } }</style></head><body><div class="header"><div class="logo">BikeCare Workshop CRM</div><div class="meta"><div>תאריך: ${new Date().toLocaleDateString('he-IL')}</div><div>מספר תיקון: #${ticket.ticketnumber}</div></div></div><div class="title">הצעת מחיר / כרטיס עבודה</div><div class="grid-container"><div class="col"><div class="section-title">פרטי לקוח</div><div class="row"><span class="label">שם:</span> ${ticket.customerName}</div><div class="row"><span class="label">טלפון:</span> ${ticket.customerPhone}</div><div class="row"><span class="label">אימייל:</span> ${ticket.customerEmail || '-'}</div></div><div class="col"><div class="section-title">פרטי אופניים</div><div class="row"><span class="label">דגם:</span> ${ticket.bikeModel}</div><div class="row"><span class="label">תקלה:</span> ${ticket.issueDescription}</div>${ticket.tagnumber ? `<div class="row"><span class="label">מספר תג:</span> ${ticket.tagnumber}</div>` : ''}</div></div><table><thead><tr><th>תיאור</th><th style="width: 60px">כמות</th><th style="width: 100px">מחיר יח׳</th><th style="width: 100px">סה״כ</th></tr></thead><tbody>${items.map(item => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${Utils.formatCurrency(item.price)}</td><td>${Utils.formatCurrency(item.quantity * item.price)}</td></tr>`).join('')}</tbody></table><div class="totals"><div class="total-row"><span>סכום ביניים:</span><span>${Utils.formatCurrency(subtotal)}</span></div><div class="total-row"><span>הנחה:</span><span>${Utils.formatCurrency(discount)}</span></div><div class="total-row grand-total"><span>סה״כ לתשלום:</span><span>${Utils.formatCurrency(total)}</span></div></div><div class="footer">הופק על ידי מערכת BikeCare Workshop CRM</div><script>window.onload = function() { window.print(); }<\/script></body></html>`;
+            const html = `<html dir="rtl"><head><title>הצעת מחיר - תיקון #${ticket.ticketNumber}</title><style>body { font-family: 'Heebo', sans-serif; padding: 40px; max-width: 800px; mx-auto; color: #333; }.header { display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }.logo { font-size: 24px; font-weight: bold; color: #2563eb; }.meta { text-align: left; font-size: 14px; color: #666; }.title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }.grid-container { display: flex; gap: 40px; margin-bottom: 30px; }.col { flex: 1; }.section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #444; }.row { margin-bottom: 5px; font-size: 14px; }.label { font-weight: 500; color: #555; }table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }th { text-align: right; background: #f9fafb; padding: 10px; font-size: 14px; border-bottom: 1px solid #ddd; }td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }.totals { margin-top: 0; margin-left: 0; margin-right: auto; width: 300px; }.total-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }.grand-total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; margin-top: 10px; padding-top: 10px; }.footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }@media print { body { padding: 0; } button { display: none; } }</style></head><body><div class="header"><div class="logo">BikeCare Workshop CRM</div><div class="meta"><div>תאריך: ${new Date().toLocaleDateString('he-IL')}</div><div>מספר תיקון: #${ticket.ticketNumber}</div></div></div><div class="title">הצעת מחיר / כרטיס עבודה</div><div class="grid-container"><div class="col"><div class="section-title">פרטי לקוח</div><div class="row"><span class="label">שם:</span> ${ticket.customerName}</div><div class="row"><span class="label">טלפון:</span> ${ticket.customerPhone}</div><div class="row"><span class="label">אימייל:</span> ${ticket.customerEmail || '-'}</div></div><div class="col"><div class="section-title">פרטי אופניים</div><div class="row"><span class="label">דגם:</span> ${ticket.bikeModel}</div><div class="row"><span class="label">תקלה:</span> ${ticket.issueDescription}</div>${ticket.tagnumber ? `<div class="row"><span class="label">מספר תג:</span> ${ticket.tagnumber}</div>` : ''}</div></div><table><thead><tr><th>תיאור</th><th style="width: 60px">כמות</th><th style="width: 100px">מחיר יח׳</th><th style="width: 100px">סה״כ</th></tr></thead><tbody>${items.map(item => `<tr><td>${item.description}</td><td>${item.quantity}</td><td>${Utils.formatCurrency(item.price)}</td><td>${Utils.formatCurrency(item.quantity * item.price)}</td></tr>`).join('')}</tbody></table><div class="totals"><div class="total-row"><span>סכום ביניים:</span><span>${Utils.formatCurrency(subtotal)}</span></div><div class="total-row"><span>הנחה:</span><span>${Utils.formatCurrency(discount)}</span></div><div class="total-row grand-total"><span>סה״כ לתשלום:</span><span>${Utils.formatCurrency(total)}</span></div></div><div class="footer">הופק על ידי מערכת BikeCare Workshop CRM</div><script>window.onload = function() { window.print(); }<\/script></body></html>`;
             printWindow.document.write(html); printWindow.document.close();
         },
 

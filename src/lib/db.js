@@ -29,19 +29,19 @@ export function createDB(sb, Utils) {
     const fieldMappings = {
       // Accept camelCase input and map to actual DB column names
       ticketNumber: 'ticketNumber',
-      ticketnumber: 'ticketNumber', // lowercase input -> camelCase DB
+      ticketNumber: 'ticketNumber', // lowercase input -> camelCase DB
       customerName: 'customerName',
-      customername: 'customerName',
+      customerName: 'customerName',
       customerPhone: 'customerPhone',
-      customerphone: 'customerPhone',
+      customerPhone: 'customerPhone',
       customerEmail: 'customerEmail',
-      customeremail: 'customerEmail',
+      customerEmail: 'customerEmail',
       bikeModel: 'bikeModel',
-      bikemodel: 'bikeModel',
+      bikeModel: 'bikeModel',
       issueDescription: 'issueDescription',
-      issuedescription: 'issueDescription',
+      issueDescription: 'issueDescription',
       internalNotes: 'internalNotes',
-      internalnotes: 'internalNotes',
+      internalNotes: 'internalNotes',
       // Accept lowercase for timestamp fields
       createdAt: 'createdat',
       createdat: 'createdat',
@@ -169,34 +169,34 @@ export function createDB(sb, Utils) {
         payload.tagnumber = formState.tagnumber || formState.tagNumber;
       }
     }
-    if (formState.ticketNumber !== undefined || formState.ticketnumber !== undefined) {
+    if (formState.ticketNumber !== undefined || formState.ticketNumber !== undefined) {
       if (VALID_DB_COLUMNS.has('ticketNumber')) {
-        payload.ticketNumber = formState.ticketNumber || formState.ticketnumber;
+        payload.ticketNumber = formState.ticketNumber || formState.ticketNumber;
       }
     }
-    if (formState.customerName !== undefined || formState.customername !== undefined) {
+    if (formState.customerName !== undefined || formState.customerName !== undefined) {
       if (VALID_DB_COLUMNS.has('customerName')) {
-        payload.customerName = formState.customerName || formState.customername;
+        payload.customerName = formState.customerName || formState.customerName;
       }
     }
-    if (formState.customerPhone !== undefined || formState.customerphone !== undefined) {
+    if (formState.customerPhone !== undefined || formState.customerPhone !== undefined) {
       if (VALID_DB_COLUMNS.has('customerPhone')) {
-        payload.customerPhone = formState.customerPhone || formState.customerphone;
+        payload.customerPhone = formState.customerPhone || formState.customerPhone;
       }
     }
-    if (formState.customerEmail !== undefined || formState.customeremail !== undefined) {
+    if (formState.customerEmail !== undefined || formState.customerEmail !== undefined) {
       if (VALID_DB_COLUMNS.has('customerEmail')) {
-        payload.customerEmail = formState.customerEmail || formState.customeremail;
+        payload.customerEmail = formState.customerEmail || formState.customerEmail;
       }
     }
-    if (formState.bikeModel !== undefined || formState.bikemodel !== undefined) {
+    if (formState.bikeModel !== undefined || formState.bikeModel !== undefined) {
       if (VALID_DB_COLUMNS.has('bikeModel')) {
-        payload.bikeModel = formState.bikeModel || formState.bikemodel;
+        payload.bikeModel = formState.bikeModel || formState.bikeModel;
       }
     }
-    if (formState.issueDescription !== undefined || formState.issuedescription !== undefined) {
+    if (formState.issueDescription !== undefined || formState.issueDescription !== undefined) {
       if (VALID_DB_COLUMNS.has('issueDescription')) {
-        payload.issueDescription = formState.issueDescription || formState.issuedescription;
+        payload.issueDescription = formState.issueDescription || formState.issueDescription;
       }
     }
     if (formState.status !== undefined && VALID_DB_COLUMNS.has('status')) {
@@ -205,9 +205,9 @@ export function createDB(sb, Utils) {
     if (formState.priority !== undefined && VALID_DB_COLUMNS.has('priority')) {
       payload.priority = formState.priority;
     }
-    if (formState.internalNotes !== undefined || formState.internalnotes !== undefined) {
+    if (formState.internalNotes !== undefined || formState.internalNotes !== undefined) {
       if (VALID_DB_COLUMNS.has('internalNotes')) {
-        payload.internalNotes = formState.internalNotes || formState.internalnotes;
+        payload.internalNotes = formState.internalNotes || formState.internalNotes;
       }
     }
     if (formState.is_archived !== undefined && VALID_DB_COLUMNS.has('is_archived')) {
