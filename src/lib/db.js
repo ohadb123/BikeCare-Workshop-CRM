@@ -25,9 +25,9 @@ export function createDB(sb, Utils) {
     const payload = {};
     
     // Map camelCase -> lowercase (accept both camelCase and lowercase input)
+    // NOTE: tagNumber is NOT accepted - frontend must use tagnumber
     const fieldMappings = {
-      // Accept camelCase input
-      tagNumber: 'tagnumber',
+      // Accept camelCase input (EXCEPT tagNumber - use tagnumber instead)
       ticketNumber: 'ticketnumber',
       customerName: 'customername',
       customerPhone: 'customerphone',
@@ -37,7 +37,7 @@ export function createDB(sb, Utils) {
       internalNotes: 'internalnotes',
       createdAt: 'createdat',
       updatedAt: 'updatedat',
-      // Also accept lowercase directly
+      // Accept lowercase directly
       tagnumber: 'tagnumber',
       ticketnumber: 'ticketnumber',
       customername: 'customername',
@@ -52,10 +52,16 @@ export function createDB(sb, Utils) {
     
     // Process all keys in raw object
     Object.keys(raw).forEach(key => {
-      // Skip if key contains uppercase (camelCase) - we'll map it below
-      if (/[A-Z]/.test(key)) {
+      // CRITICAL: Reject tagNumber (camelCase) - frontend must use tagnumber
+      if (key === 'tagNumber') {
+        console.error('[sanitizeTicketPayload] REJECTED: tagNumber (camelCase) found. Use tagnumber instead.');
+        return; // Skip this key entirely
+      }
+      
+      // First, try to map camelCase to lowercase
+      if (fieldMappings[key]) {
         const mappedKey = fieldMappings[key];
-        if (mappedKey && VALID_DB_COLUMNS.has(mappedKey)) {
+        if (VALID_DB_COLUMNS.has(mappedKey)) {
           payload[mappedKey] = raw[key];
         }
       } else if (VALID_DB_COLUMNS.has(key)) {
