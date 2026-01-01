@@ -14,6 +14,136 @@ export function createDB(sb, Utils) {
     'is_archived', 'history', 'quote'
   ]);
 
+  /**
+   * HARD sanitizer: Aggressively removes ALL camelCase keys and ensures only valid DB columns
+   * This is the FINAL step before sending to Supabase - applied AFTER all merges/spreads
+   */
+  const sanitizeTicketPayload = (raw, isUpdate = false) => {
+    if (!raw || typeof raw !== 'object') return {};
+    
+    // Step 1: Create a clean payload by mapping known camelCase fields to lowercase
+    const payload = {};
+    
+    // Map camelCase -> lowercase (accept both camelCase and lowercase input)
+    const fieldMappings = {
+      // Accept camelCase input
+      tagNumber: 'tagnumber',
+      ticketNumber: 'ticketnumber',
+      customerName: 'customername',
+      customerPhone: 'customerphone',
+      customerEmail: 'customeremail',
+      bikeModel: 'bikemodel',
+      issueDescription: 'issuedescription',
+      internalNotes: 'internalnotes',
+      createdAt: 'createdat',
+      updatedAt: 'updatedat',
+      // Also accept lowercase directly
+      tagnumber: 'tagnumber',
+      ticketnumber: 'ticketnumber',
+      customername: 'customername',
+      customerphone: 'customerphone',
+      customeremail: 'customeremail',
+      bikemodel: 'bikemodel',
+      issuedescription: 'issuedescription',
+      internalnotes: 'internalnotes',
+      createdat: 'createdat',
+      updatedat: 'updatedat'
+    };
+    
+    // Process all keys in raw object
+    Object.keys(raw).forEach(key => {
+      // Skip if key contains uppercase (camelCase) - we'll map it below
+      if (/[A-Z]/.test(key)) {
+        const mappedKey = fieldMappings[key];
+        if (mappedKey && VALID_DB_COLUMNS.has(mappedKey)) {
+          payload[mappedKey] = raw[key];
+        }
+      } else if (VALID_DB_COLUMNS.has(key)) {
+        // Direct lowercase key that exists in DB
+        payload[key] = raw[key];
+      }
+      // All other keys (including unknown camelCase) are ignored
+    });
+    
+    // Step 2: Handle jsonb fields - ensure proper format
+    if (raw.history !== undefined || raw.History !== undefined) {
+      const historyValue = raw.history || raw.History;
+      if (typeof historyValue === 'string') {
+        try {
+          payload.history = JSON.parse(historyValue);
+        } catch (e) {
+          payload.history = [];
+        }
+      } else {
+        payload.history = Array.isArray(historyValue) ? historyValue : [];
+      }
+    }
+    
+    if (raw.quote !== undefined || raw.Quote !== undefined) {
+      const quoteValue = raw.quote || raw.Quote;
+      if (typeof quoteValue === 'string') {
+        try {
+          payload.quote = JSON.parse(quoteValue);
+        } catch (e) {
+          payload.quote = null;
+        }
+      } else {
+        payload.quote = quoteValue;
+      }
+    }
+    
+    // Step 3: Handle status, priority, is_archived (no mapping needed, already lowercase or underscore)
+    if (raw.status !== undefined) payload.status = raw.status;
+    if (raw.priority !== undefined) payload.priority = raw.priority;
+    if (raw.is_archived !== undefined) payload.is_archived = raw.is_archived;
+    
+    // Step 4: Remove immutable fields for updates
+    if (isUpdate) {
+      delete payload.id;
+      delete payload.createdat;
+      payload.updatedat = new Date().toISOString();
+    }
+    
+    // Step 5: CRITICAL - Remove ALL keys not in VALID_DB_COLUMNS
+    Object.keys(payload).forEach(key => {
+      if (!VALID_DB_COLUMNS.has(key)) {
+        delete payload[key];
+      }
+    });
+    
+    // Step 6: Remove undefined/null values (except for explicit nulls in jsonb)
+    Object.keys(payload).forEach(key => {
+      if (payload[key] === undefined) {
+        delete payload[key];
+      }
+    });
+    
+    // Step 7: FINAL HARD CHECK - Remove ANY remaining camelCase keys
+    Object.keys(payload).forEach(key => {
+      if (/[A-Z]/.test(key)) {
+        console.error('[sanitizeTicketPayload] CRITICAL: Removing camelCase key:', key);
+        delete payload[key];
+      }
+    });
+    
+    // Step 8: GUARD - Throw error if tagNumber (camelCase) is found in payload
+    const payloadString = JSON.stringify(payload);
+    if (payloadString.includes('"tagNumber"') || payloadString.includes("'tagNumber'")) {
+      console.error('[sanitizeTicketPayload] CRITICAL: tagNumber (camelCase) found in payload!', payload);
+      throw new Error('CRITICAL: tagNumber (camelCase) detected in payload. This should never happen.');
+    }
+    
+    // Step 9: Verify final payload only contains lowercase keys
+    const finalKeys = Object.keys(payload);
+    const invalidKeys = finalKeys.filter(k => !VALID_DB_COLUMNS.has(k) || /[A-Z]/.test(k));
+    if (invalidKeys.length > 0) {
+      console.error('[sanitizeTicketPayload] CRITICAL: Invalid keys in final payload:', invalidKeys);
+      invalidKeys.forEach(k => delete payload[k]);
+    }
+    
+    return payload;
+  };
+
   const buildTicketPayload = (formState, isUpdate = false) => {
     if (!formState || typeof formState !== 'object') return {};
     
@@ -291,40 +421,24 @@ export function createDB(sb, Utils) {
         // Extract timeline (doesn't exist in DB, stored in localStorage)
         const { timeline, ...ticketForDb } = ticket;
         
-        // CRITICAL: Remove any camelCase keys before building payload
-        // This prevents any camelCase from leaking into the payload
-        const cleanTicket = {};
-        Object.keys(ticketForDb).forEach(key => {
-          // Only pass known camelCase fields that will be mapped
-          // Don't pass through any unknown fields
-          if (['tagnumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
-               'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
-               'is_archived', 'history', 'quote', 'id', 'createdAt', 'updatedAt'].includes(key)) {
-            cleanTicket[key] = ticketForDb[key];
-          }
-        });
-        
-        // Build payload with lowercase column names
-        const payload = buildTicketPayload({
-          ...cleanTicket,
+        // Build initial payload (may contain camelCase from merges)
+        const initialPayload = {
+          ...ticketForDb,
           id: Utils.id(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        }, false);
+        };
         
-        // Final safety check: ensure payload has NO camelCase keys
-        const payloadKeys = Object.keys(payload);
-        const camelCaseKeys = payloadKeys.filter(k => /[A-Z]/.test(k));
-        if (camelCaseKeys.length > 0) {
-          console.error('[DB.add] CRITICAL: Payload contains camelCase keys:', camelCaseKeys);
-          camelCaseKeys.forEach(k => delete payload[k]);
-        }
-
+        // CRITICAL: Apply HARD sanitizer LAST - after all merges/spreads
+        // This ensures NO camelCase keys can survive
+        const payload = sanitizeTicketPayload(initialPayload, false);
+        
         // Log payload keys for debugging
-        console.log('[DB.add] Payload keys (must be all lowercase):', Object.keys(payload));
-        const hasCamelCaseInPayload = Object.keys(payload).some(k => /[A-Z]/.test(k));
-        if (hasCamelCaseInPayload) {
-          console.error('[DB.add] ERROR: Payload contains camelCase keys!', Object.keys(payload));
+        console.log('[DB.add] Final payload keys (must be all lowercase):', Object.keys(payload));
+        
+        // Final guard: throw if tagNumber found
+        if (JSON.stringify(payload).includes('tagNumber')) {
+          throw new Error('CRITICAL: tagNumber found in payload after sanitization!');
         }
 
         const { data, error } = await sb
@@ -372,35 +486,16 @@ export function createDB(sb, Utils) {
         // Extract timeline (doesn't exist in DB, stored in localStorage)
         const { timeline, ...updatesForDb } = updates;
         
-        // CRITICAL: Remove any camelCase keys before building payload
-        // This prevents any camelCase from leaking into the payload
-        const cleanUpdates = {};
-        Object.keys(updatesForDb).forEach(key => {
-          // Only pass known camelCase fields that will be mapped
-          // Don't pass through any unknown fields
-          if (['tagnumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
-               'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
-               'is_archived', 'history', 'quote'].includes(key)) {
-            cleanUpdates[key] = updatesForDb[key];
-          }
-        });
+        // CRITICAL: Apply HARD sanitizer LAST - after all merges/spreads
+        // This ensures NO camelCase keys can survive, even if reintroduced via state merge
+        const payload = sanitizeTicketPayload(updatesForDb, true);
         
-        // Build payload with lowercase column names (excludes id, createdAt automatically)
-        const payload = buildTicketPayload(cleanUpdates, true);
-        
-        // Final safety check: ensure payload has NO camelCase keys
-        const payloadKeys = Object.keys(payload);
-        const camelCaseKeys = payloadKeys.filter(k => /[A-Z]/.test(k));
-        if (camelCaseKeys.length > 0) {
-          console.error('[DB.update] CRITICAL: Payload contains camelCase keys:', camelCaseKeys);
-          camelCaseKeys.forEach(k => delete payload[k]);
-        }
-
         // Log payload keys for debugging
-        console.log('[DB.update] Payload keys (must be all lowercase):', Object.keys(payload));
-        const hasCamelCaseInPayload = Object.keys(payload).some(k => /[A-Z]/.test(k));
-        if (hasCamelCaseInPayload) {
-          console.error('[DB.update] ERROR: Payload contains camelCase keys!', Object.keys(payload));
+        console.log('[DB.update] Final payload keys (must be all lowercase):', Object.keys(payload));
+        
+        // Final guard: throw if tagNumber found
+        if (JSON.stringify(payload).includes('tagNumber')) {
+          throw new Error('CRITICAL: tagNumber found in payload after sanitization!');
         }
 
         // Enhanced error logging: capture full response details
