@@ -7,11 +7,11 @@ export function createDB(sb, Utils) {
    * List of valid database column names (lowercase only)
    * Only these columns will be included in payloads sent to Supabase
    */
+  // Actual database schema column names (case-sensitive)
   const VALID_DB_COLUMNS = new Set([
-    'id', 'createdat', 'updatedat', 'ticketnumber', 'tagnumber', 
-    'customername', 'customerphone', 'customeremail', 'bikemodel', 
-    'issuedescription', 'status', 'priority', 'internalnotes', 
-    'is_archived', 'history', 'quote'
+    'id', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail',
+    'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes',
+    'quote', 'createdat', 'updatedat', 'is_archived', 'history', 'timeline', 'tagnumber'
   ]);
 
   /**
@@ -24,30 +24,31 @@ export function createDB(sb, Utils) {
     // Step 1: Create a clean payload by mapping known camelCase fields to lowercase
     const payload = {};
     
-    // Map camelCase -> lowercase (accept both camelCase and lowercase input)
+    // Map frontend input to actual database column names (case-sensitive)
     // NOTE: tagNumber is NOT accepted - frontend must use tagnumber
     const fieldMappings = {
-      // Accept camelCase input (EXCEPT tagNumber - use tagnumber instead)
-      ticketnumber: 'ticketnumber',
-      customerName: 'customername',
-      customerPhone: 'customerphone',
-      customerEmail: 'customeremail',
-      bikeModel: 'bikemodel',
-      issueDescription: 'issuedescription',
-      internalNotes: 'internalnotes',
+      // Accept camelCase input and map to actual DB column names
+      ticketNumber: 'ticketNumber',
+      ticketnumber: 'ticketNumber', // lowercase input -> camelCase DB
+      customerName: 'customerName',
+      customername: 'customerName',
+      customerPhone: 'customerPhone',
+      customerphone: 'customerPhone',
+      customerEmail: 'customerEmail',
+      customeremail: 'customerEmail',
+      bikeModel: 'bikeModel',
+      bikemodel: 'bikeModel',
+      issueDescription: 'issueDescription',
+      issuedescription: 'issueDescription',
+      internalNotes: 'internalNotes',
+      internalnotes: 'internalNotes',
+      // Accept lowercase for timestamp fields
       createdAt: 'createdat',
-      updatedAt: 'updatedat',
-      // Accept lowercase directly
-      tagnumber: 'tagnumber',
-      ticketnumber: 'ticketnumber',
-      customername: 'customername',
-      customerphone: 'customerphone',
-      customeremail: 'customeremail',
-      bikemodel: 'bikemodel',
-      issuedescription: 'issuedescription',
-      internalnotes: 'internalnotes',
       createdat: 'createdat',
-      updatedat: 'updatedat'
+      updatedAt: 'updatedat',
+      updatedat: 'updatedat',
+      // Accept lowercase for tagnumber
+      tagnumber: 'tagnumber'
     };
     
     // Process all keys in raw object
@@ -65,7 +66,7 @@ export function createDB(sb, Utils) {
           payload[mappedKey] = raw[key];
         }
       } else if (VALID_DB_COLUMNS.has(key)) {
-        // Direct lowercase key that exists in DB
+        // Direct key that exists in DB (can be camelCase or lowercase)
         payload[key] = raw[key];
       }
       // All other keys (including unknown camelCase) are ignored
@@ -108,6 +109,11 @@ export function createDB(sb, Utils) {
       delete payload.id;
       delete payload.createdat;
       payload.updatedat = new Date().toISOString();
+    } else {
+      // For inserts: ensure createdat is set
+      if (!payload.createdat) {
+        payload.createdat = new Date().toISOString();
+      }
     }
     
     // Step 5: CRITICAL - Remove ALL keys not in VALID_DB_COLUMNS
@@ -124,10 +130,11 @@ export function createDB(sb, Utils) {
       }
     });
     
-    // Step 7: FINAL HARD CHECK - Remove ANY remaining camelCase keys
+    // Step 7: FINAL HARD CHECK - Remove keys that don't match actual DB schema
+    // NOTE: Some DB columns ARE camelCase (ticketNumber, customerName, etc.), so we only remove invalid ones
     Object.keys(payload).forEach(key => {
-      if (/[A-Z]/.test(key)) {
-        console.error('[sanitizeTicketPayload] CRITICAL: Removing camelCase key:', key);
+      if (!VALID_DB_COLUMNS.has(key)) {
+        console.error('[sanitizeTicketPayload] CRITICAL: Removing invalid key:', key);
         delete payload[key];
       }
     });
@@ -139,9 +146,9 @@ export function createDB(sb, Utils) {
       throw new Error('CRITICAL: tagNumber (camelCase) detected in payload. This should never happen.');
     }
     
-    // Step 9: Verify final payload only contains lowercase keys
+    // Step 9: Verify final payload only contains valid DB column names
     const finalKeys = Object.keys(payload);
-    const invalidKeys = finalKeys.filter(k => !VALID_DB_COLUMNS.has(k) || /[A-Z]/.test(k));
+    const invalidKeys = finalKeys.filter(k => !VALID_DB_COLUMNS.has(k));
     if (invalidKeys.length > 0) {
       console.error('[sanitizeTicketPayload] CRITICAL: Invalid keys in final payload:', invalidKeys);
       invalidKeys.forEach(k => delete payload[k]);
@@ -155,28 +162,42 @@ export function createDB(sb, Utils) {
     
     const payload = {};
     
-    // Map camelCase to lowercase column names - ONLY include if column exists in DB
-    // NOTE: Only map fields that exist in VALID_DB_COLUMNS
-    if (formState.tagnumber !== undefined && VALID_DB_COLUMNS.has('tagnumber')) {
-      payload.tagnumber = formState.tagnumber;
+    // Map frontend input to actual database column names (case-sensitive)
+    // Accept both camelCase and lowercase input, output exact DB column names
+    if (formState.tagnumber !== undefined || formState.tagNumber !== undefined) {
+      if (VALID_DB_COLUMNS.has('tagnumber')) {
+        payload.tagnumber = formState.tagnumber || formState.tagNumber;
+      }
     }
-    if (formState.ticketnumber !== undefined && VALID_DB_COLUMNS.has('ticketnumber')) {
-      payload.ticketnumber = formState.ticketnumber;
+    if (formState.ticketNumber !== undefined || formState.ticketnumber !== undefined) {
+      if (VALID_DB_COLUMNS.has('ticketNumber')) {
+        payload.ticketNumber = formState.ticketNumber || formState.ticketnumber;
+      }
     }
-    if (formState.customerName !== undefined && VALID_DB_COLUMNS.has('customername')) {
-      payload.customername = formState.customerName;
+    if (formState.customerName !== undefined || formState.customername !== undefined) {
+      if (VALID_DB_COLUMNS.has('customerName')) {
+        payload.customerName = formState.customerName || formState.customername;
+      }
     }
-    if (formState.customerPhone !== undefined && VALID_DB_COLUMNS.has('customerphone')) {
-      payload.customerphone = formState.customerPhone;
+    if (formState.customerPhone !== undefined || formState.customerphone !== undefined) {
+      if (VALID_DB_COLUMNS.has('customerPhone')) {
+        payload.customerPhone = formState.customerPhone || formState.customerphone;
+      }
     }
-    if (formState.customerEmail !== undefined && VALID_DB_COLUMNS.has('customeremail')) {
-      payload.customeremail = formState.customerEmail;
+    if (formState.customerEmail !== undefined || formState.customeremail !== undefined) {
+      if (VALID_DB_COLUMNS.has('customerEmail')) {
+        payload.customerEmail = formState.customerEmail || formState.customeremail;
+      }
     }
-    if (formState.bikeModel !== undefined && VALID_DB_COLUMNS.has('bikemodel')) {
-      payload.bikemodel = formState.bikeModel;
+    if (formState.bikeModel !== undefined || formState.bikemodel !== undefined) {
+      if (VALID_DB_COLUMNS.has('bikeModel')) {
+        payload.bikeModel = formState.bikeModel || formState.bikemodel;
+      }
     }
-    if (formState.issueDescription !== undefined && VALID_DB_COLUMNS.has('issuedescription')) {
-      payload.issuedescription = formState.issueDescription;
+    if (formState.issueDescription !== undefined || formState.issuedescription !== undefined) {
+      if (VALID_DB_COLUMNS.has('issueDescription')) {
+        payload.issueDescription = formState.issueDescription || formState.issuedescription;
+      }
     }
     if (formState.status !== undefined && VALID_DB_COLUMNS.has('status')) {
       payload.status = formState.status;
@@ -184,8 +205,10 @@ export function createDB(sb, Utils) {
     if (formState.priority !== undefined && VALID_DB_COLUMNS.has('priority')) {
       payload.priority = formState.priority;
     }
-    if (formState.internalNotes !== undefined && VALID_DB_COLUMNS.has('internalnotes')) {
-      payload.internalnotes = formState.internalNotes;
+    if (formState.internalNotes !== undefined || formState.internalnotes !== undefined) {
+      if (VALID_DB_COLUMNS.has('internalNotes')) {
+        payload.internalNotes = formState.internalNotes || formState.internalnotes;
+      }
     }
     if (formState.is_archived !== undefined && VALID_DB_COLUMNS.has('is_archived')) {
       payload.is_archived = formState.is_archived;
@@ -218,18 +241,18 @@ export function createDB(sb, Utils) {
       }
     }
     
-    // For updates: always set updatedAt, never include id or createdAt
+    // For updates: always set updatedat, never include id or createdat
     if (isUpdate) {
       if (VALID_DB_COLUMNS.has('updatedat')) {
         payload.updatedat = new Date().toISOString();
       }
     } else {
-      // For inserts: include createdAt and updatedAt
+      // For inserts: include createdat and updatedat
       if (VALID_DB_COLUMNS.has('createdat')) {
-        payload.createdat = formState.createdAt || new Date().toISOString();
+        payload.createdat = formState.createdAt || formState.createdat || new Date().toISOString();
       }
       if (VALID_DB_COLUMNS.has('updatedat')) {
-        payload.updatedat = formState.updatedAt || new Date().toISOString();
+        payload.updatedat = formState.updatedAt || formState.updatedat || new Date().toISOString();
       }
     }
     
@@ -257,26 +280,29 @@ export function createDB(sb, Utils) {
   };
 
   /**
-   * Maps lowercase database column names back to camelCase for frontend
+   * Maps database column names to frontend format
+   * DB uses mixed case: ticketNumber (camelCase), createdat (lowercase), tagnumber (lowercase)
+   * Frontend expects camelCase for most fields, lowercase for tagnumber
    */
   const mapDbToFrontend = (dbRow) => {
     if (!dbRow) return dbRow;
     
     return {
       ...dbRow,
+      // DB columns are already in correct case, just ensure they're accessible
+      ticketNumber: dbRow.ticketNumber,
+      customerName: dbRow.customerName,
+      customerPhone: dbRow.customerPhone,
+      customerEmail: dbRow.customerEmail,
+      bikeModel: dbRow.bikeModel,
+      issueDescription: dbRow.issueDescription,
+      internalNotes: dbRow.internalNotes,
       tagnumber: dbRow.tagnumber,
-      ticketnumber: dbRow.ticketnumber,
-      customerName: dbRow.customername,
-      customerPhone: dbRow.customerphone,
-      customerEmail: dbRow.customeremail,
-      bikeModel: dbRow.bikemodel,
-      issueDescription: dbRow.issuedescription,
-      internalNotes: dbRow.internalnotes,
-      is_archived: dbRow.is_archived,
       createdAt: dbRow.createdat,
       updatedAt: dbRow.updatedat,
       // jsonb fields are already in correct format
       history: dbRow.history || [],
+      timeline: dbRow.timeline || [],
       quote: dbRow.quote || null
     };
   };
@@ -394,7 +420,7 @@ export function createDB(sb, Utils) {
       try {
         const { data, error } = await sb
           .from('tickets')
-          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
+          .select('id, ticketNumber, customerName, customerPhone, customerEmail, bikeModel, issueDescription, status, priority, internalNotes, quote, createdat, updatedat, is_archived, history, timeline, tagnumber')
           .order('createdat', { ascending: false });
 
         if (error) {
@@ -440,7 +466,7 @@ export function createDB(sb, Utils) {
         const payload = sanitizeTicketPayload(initialPayload, false);
         
         // Log payload keys for debugging
-        console.log('[DB.add] Final payload keys (must be all lowercase):', Object.keys(payload));
+        console.log('[DB.add] Final payload keys:', Object.keys(payload));
         
         // Final guard: throw if tagNumber found
         if (JSON.stringify(payload).includes('tagNumber')) {
@@ -450,7 +476,7 @@ export function createDB(sb, Utils) {
         const { data, error } = await sb
           .from('tickets')
           .insert([payload])
-          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
+          .select('id, ticketNumber, customerName, customerPhone, customerEmail, bikeModel, issueDescription, status, priority, internalNotes, quote, createdat, updatedat, is_archived, history, timeline, tagnumber')
           .single();
 
         if (error) {
@@ -497,7 +523,7 @@ export function createDB(sb, Utils) {
         const payload = sanitizeTicketPayload(updatesForDb, true);
         
         // Log payload keys for debugging
-        console.log('[DB.update] Final payload keys (must be all lowercase):', Object.keys(payload));
+        console.log('[DB.update] Final payload keys:', Object.keys(payload));
         
         // Final guard: throw if tagNumber found
         if (JSON.stringify(payload).includes('tagNumber')) {
@@ -510,7 +536,7 @@ export function createDB(sb, Utils) {
           .from('tickets')
           .update(payload)
           .eq('id', id)
-          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
+          .select('id, ticketNumber, customerName, customerPhone, customerEmail, bikeModel, issueDescription, status, priority, internalNotes, quote, createdat, updatedat, is_archived, history, timeline, tagnumber')
           .single();
 
         if (error) {
