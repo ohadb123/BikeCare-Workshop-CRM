@@ -3,26 +3,60 @@ export function createDB(sb, Utils) {
    * Maps camelCase frontend field names to lowercase database column names
    * PostgREST is case-sensitive and requires exact column name matches
    */
+  /**
+   * List of valid database column names (lowercase only)
+   * Only these columns will be included in payloads sent to Supabase
+   */
+  const VALID_DB_COLUMNS = new Set([
+    'id', 'createdat', 'updatedat', 'ticketnumber', 'tagnumber', 
+    'customername', 'customerphone', 'customeremail', 'bikemodel', 
+    'issuedescription', 'status', 'priority', 'internalnotes', 
+    'is_archived', 'history', 'quote'
+  ]);
+
   const buildTicketPayload = (formState, isUpdate = false) => {
     if (!formState || typeof formState !== 'object') return {};
     
     const payload = {};
     
-    // Map camelCase to lowercase column names
-    if (formState.tagNumber !== undefined) payload.tagnumber = formState.tagNumber;
-    if (formState.ticketNumber !== undefined) payload.ticketnumber = formState.ticketNumber;
-    if (formState.customerName !== undefined) payload.customername = formState.customerName;
-    if (formState.customerPhone !== undefined) payload.customerphone = formState.customerPhone;
-    if (formState.customerEmail !== undefined) payload.customeremail = formState.customerEmail;
-    if (formState.bikeModel !== undefined) payload.bikemodel = formState.bikeModel;
-    if (formState.issueDescription !== undefined) payload.issuedescription = formState.issueDescription;
-    if (formState.status !== undefined) payload.status = formState.status;
-    if (formState.priority !== undefined) payload.priority = formState.priority;
-    if (formState.internalNotes !== undefined) payload.internalnotes = formState.internalNotes;
-    if (formState.is_archived !== undefined) payload.is_archived = formState.is_archived;
+    // Map camelCase to lowercase column names - ONLY include if column exists in DB
+    // NOTE: Only map fields that exist in VALID_DB_COLUMNS
+    if (formState.tagNumber !== undefined && VALID_DB_COLUMNS.has('tagnumber')) {
+      payload.tagnumber = formState.tagNumber;
+    }
+    if (formState.ticketNumber !== undefined && VALID_DB_COLUMNS.has('ticketnumber')) {
+      payload.ticketnumber = formState.ticketNumber;
+    }
+    if (formState.customerName !== undefined && VALID_DB_COLUMNS.has('customername')) {
+      payload.customername = formState.customerName;
+    }
+    if (formState.customerPhone !== undefined && VALID_DB_COLUMNS.has('customerphone')) {
+      payload.customerphone = formState.customerPhone;
+    }
+    if (formState.customerEmail !== undefined && VALID_DB_COLUMNS.has('customeremail')) {
+      payload.customeremail = formState.customerEmail;
+    }
+    if (formState.bikeModel !== undefined && VALID_DB_COLUMNS.has('bikemodel')) {
+      payload.bikemodel = formState.bikeModel;
+    }
+    if (formState.issueDescription !== undefined && VALID_DB_COLUMNS.has('issuedescription')) {
+      payload.issuedescription = formState.issueDescription;
+    }
+    if (formState.status !== undefined && VALID_DB_COLUMNS.has('status')) {
+      payload.status = formState.status;
+    }
+    if (formState.priority !== undefined && VALID_DB_COLUMNS.has('priority')) {
+      payload.priority = formState.priority;
+    }
+    if (formState.internalNotes !== undefined && VALID_DB_COLUMNS.has('internalnotes')) {
+      payload.internalnotes = formState.internalNotes;
+    }
+    if (formState.is_archived !== undefined && VALID_DB_COLUMNS.has('is_archived')) {
+      payload.is_archived = formState.is_archived;
+    }
     
     // Handle jsonb fields - ensure they are proper JSON objects/arrays
-    if (formState.history !== undefined) {
+    if (formState.history !== undefined && VALID_DB_COLUMNS.has('history')) {
       if (typeof formState.history === 'string') {
         try {
           payload.history = JSON.parse(formState.history);
@@ -34,7 +68,7 @@ export function createDB(sb, Utils) {
       }
     }
     
-    if (formState.quote !== undefined) {
+    if (formState.quote !== undefined && VALID_DB_COLUMNS.has('quote')) {
       if (typeof formState.quote === 'string') {
         try {
           payload.quote = JSON.parse(formState.quote);
@@ -50,19 +84,38 @@ export function createDB(sb, Utils) {
     
     // For updates: always set updatedAt, never include id or createdAt
     if (isUpdate) {
-      payload.updatedat = new Date().toISOString();
+      if (VALID_DB_COLUMNS.has('updatedat')) {
+        payload.updatedat = new Date().toISOString();
+      }
     } else {
       // For inserts: include createdAt and updatedAt
-      payload.createdat = formState.createdAt || new Date().toISOString();
-      payload.updatedat = formState.updatedAt || new Date().toISOString();
+      if (VALID_DB_COLUMNS.has('createdat')) {
+        payload.createdat = formState.createdAt || new Date().toISOString();
+      }
+      if (VALID_DB_COLUMNS.has('updatedat')) {
+        payload.updatedat = formState.updatedAt || new Date().toISOString();
+      }
     }
     
-    // Remove undefined values
+    // CRITICAL: Remove any keys that are NOT in VALID_DB_COLUMNS
+    // This prevents camelCase or invalid columns from being sent
     Object.keys(payload).forEach(key => {
-      if (payload[key] === undefined) {
+      if (!VALID_DB_COLUMNS.has(key) || payload[key] === undefined) {
         delete payload[key];
       }
     });
+    
+    // Final validation: ensure no camelCase keys slipped through
+    const hasCamelCase = Object.keys(payload).some(key => /[A-Z]/.test(key));
+    if (hasCamelCase) {
+      console.error('[buildTicketPayload] ERROR: Found camelCase keys in payload:', Object.keys(payload));
+      // Remove any camelCase keys
+      Object.keys(payload).forEach(key => {
+        if (/[A-Z]/.test(key)) {
+          delete payload[key];
+        }
+      });
+    }
     
     return payload;
   };
@@ -238,13 +291,41 @@ export function createDB(sb, Utils) {
         // Extract timeline (doesn't exist in DB, stored in localStorage)
         const { timeline, ...ticketForDb } = ticket;
         
+        // CRITICAL: Remove any camelCase keys before building payload
+        // This prevents any camelCase from leaking into the payload
+        const cleanTicket = {};
+        Object.keys(ticketForDb).forEach(key => {
+          // Only pass known camelCase fields that will be mapped
+          // Don't pass through any unknown fields
+          if (['tagNumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
+               'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
+               'is_archived', 'history', 'quote', 'id', 'createdAt', 'updatedAt'].includes(key)) {
+            cleanTicket[key] = ticketForDb[key];
+          }
+        });
+        
         // Build payload with lowercase column names
         const payload = buildTicketPayload({
-          ...ticketForDb,
+          ...cleanTicket,
           id: Utils.id(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }, false);
+        
+        // Final safety check: ensure payload has NO camelCase keys
+        const payloadKeys = Object.keys(payload);
+        const camelCaseKeys = payloadKeys.filter(k => /[A-Z]/.test(k));
+        if (camelCaseKeys.length > 0) {
+          console.error('[DB.add] CRITICAL: Payload contains camelCase keys:', camelCaseKeys);
+          camelCaseKeys.forEach(k => delete payload[k]);
+        }
+
+        // Log payload keys for debugging
+        console.log('[DB.add] Payload keys (must be all lowercase):', Object.keys(payload));
+        const hasCamelCaseInPayload = Object.keys(payload).some(k => /[A-Z]/.test(k));
+        if (hasCamelCaseInPayload) {
+          console.error('[DB.add] ERROR: Payload contains camelCase keys!', Object.keys(payload));
+        }
 
         const { data, error } = await sb
           .from('tickets')
@@ -291,15 +372,36 @@ export function createDB(sb, Utils) {
         // Extract timeline (doesn't exist in DB, stored in localStorage)
         const { timeline, ...updatesForDb } = updates;
         
-        // Build payload with lowercase column names (excludes id, createdAt automatically)
-        const payload = buildTicketPayload(updatesForDb, true);
-
-        // Log the payload before sending (for debugging)
-        console.log('[DB.update] Sending PATCH:', {
-          id,
-          payload: JSON.stringify(payload),
-          payloadKeys: Object.keys(payload)
+        // CRITICAL: Remove any camelCase keys before building payload
+        // This prevents any camelCase from leaking into the payload
+        const cleanUpdates = {};
+        Object.keys(updatesForDb).forEach(key => {
+          // Only pass known camelCase fields that will be mapped
+          // Don't pass through any unknown fields
+          if (['tagNumber', 'ticketNumber', 'customerName', 'customerPhone', 'customerEmail', 
+               'bikeModel', 'issueDescription', 'status', 'priority', 'internalNotes', 
+               'is_archived', 'history', 'quote'].includes(key)) {
+            cleanUpdates[key] = updatesForDb[key];
+          }
         });
+        
+        // Build payload with lowercase column names (excludes id, createdAt automatically)
+        const payload = buildTicketPayload(cleanUpdates, true);
+        
+        // Final safety check: ensure payload has NO camelCase keys
+        const payloadKeys = Object.keys(payload);
+        const camelCaseKeys = payloadKeys.filter(k => /[A-Z]/.test(k));
+        if (camelCaseKeys.length > 0) {
+          console.error('[DB.update] CRITICAL: Payload contains camelCase keys:', camelCaseKeys);
+          camelCaseKeys.forEach(k => delete payload[k]);
+        }
+
+        // Log payload keys for debugging
+        console.log('[DB.update] Payload keys (must be all lowercase):', Object.keys(payload));
+        const hasCamelCaseInPayload = Object.keys(payload).some(k => /[A-Z]/.test(k));
+        if (hasCamelCaseInPayload) {
+          console.error('[DB.update] ERROR: Payload contains camelCase keys!', Object.keys(payload));
+        }
 
         // Enhanced error logging: capture full response details
         // Use explicit lowercase column selection
