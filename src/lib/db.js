@@ -28,18 +28,12 @@ export function createDB(sb, Utils) {
           const ticketId = key.replace('ticket_extras_', '');
           const extras = JSON.parse(localStorage.getItem(key) || '{}');
           
+          // Migration: extras are already in localStorage, no need to update Supabase
+          // Just keep them in localStorage (they're not columns in Supabase)
+          // This migration function can be simplified or removed
           if (extras.history || extras.timeline || extras.tagNumber !== undefined) {
-            const updateData = {
-              history: extras.history || null,
-              timeline: extras.timeline || null,
-              tagNumber: extras.tagNumber || null,
-              updatedAt: new Date().toISOString()
-            };
-            
-            const { error } = await sb.from('tickets').update(updateData).eq('id', ticketId);
-            if (!error) {
-              localStorage.removeItem(key); // Clean up after successful migration
-            }
+            // Extras are already stored correctly in localStorage, no action needed
+            console.log(`Keeping extras for ticket ${ticketId} in localStorage`);
           }
         } catch (e) {
           console.warn(`Failed to migrate legacy data for ${key}:`, e);
@@ -66,12 +60,17 @@ export function createDB(sb, Utils) {
         }
 
         // Ensure all tickets have default values for optional fields
-        return (data || []).map(t => ({
-          ...t,
-          history: t.history || [],
-          timeline: t.timeline || [],
-          quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
-        }));
+        // Merge with localStorage extras (history, timeline, tagNumber)
+        return (data || []).map(t => {
+          const extras = JSON.parse(localStorage.getItem(`ticket_extras_${t.id}`) || '{}');
+          return {
+            ...t,
+            history: extras.history || t.history || [],
+            timeline: extras.timeline || t.timeline || [],
+            tagNumber: extras.tagNumber !== undefined ? extras.tagNumber : (t.tagNumber || null),
+            quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+          };
+        });
       } catch (e) {
         console.error("DB Connection Error:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בחיבור למסד הנתונים", "error");
@@ -81,15 +80,14 @@ export function createDB(sb, Utils) {
 
     add: async (ticket) => {
       try {
+        // Extract fields that don't exist in Supabase schema
+        const { history, timeline, tagNumber, ...supabaseFields } = ticket;
+        
         const newTicket = {
           id: Utils.id(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          // Store all fields including history, timeline, tagNumber in Supabase
-          history: ticket.history || [],
-          timeline: ticket.timeline || [],
-          tagNumber: ticket.tagNumber || null,
-          ...ticket
+          ...supabaseFields
         };
 
         const { data, error } = await sb.from('tickets').insert([newTicket]).select().single();
@@ -100,7 +98,21 @@ export function createDB(sb, Utils) {
           throw error;
         }
 
-        return data || newTicket;
+        // Store extras in localStorage (always store to ensure consistency)
+        const extras = {
+          history: history || [],
+          timeline: timeline || [],
+          tagNumber: tagNumber || null
+        };
+        localStorage.setItem(`ticket_extras_${data.id}`, JSON.stringify(extras));
+
+        // Merge extras with Supabase data
+        return {
+          ...data,
+          history: extras.history,
+          timeline: extras.timeline,
+          tagNumber: extras.tagNumber
+        };
       } catch (e) {
         console.error("Failed to add ticket:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בשמירת התיקון", "error");
@@ -110,8 +122,11 @@ export function createDB(sb, Utils) {
 
     update: async (id, updates) => {
       try {
+        // Extract fields that don't exist in Supabase schema
+        const { history, timeline, tagNumber, ...supabaseUpdates } = updates;
+        
         const updateData = {
-          ...updates,
+          ...supabaseUpdates,
           updatedAt: new Date().toISOString()
         };
 
@@ -128,7 +143,26 @@ export function createDB(sb, Utils) {
           throw error;
         }
 
-        return data;
+        // Always merge extras from localStorage (whether updated or not)
+        const existingExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
+        const newExtras = {
+          history: history !== undefined ? history : (existingExtras.history || []),
+          timeline: timeline !== undefined ? timeline : (existingExtras.timeline || []),
+          tagNumber: tagNumber !== undefined ? tagNumber : (existingExtras.tagNumber || null)
+        };
+        
+        // Update localStorage if extras were provided
+        if (history !== undefined || timeline !== undefined || tagNumber !== undefined) {
+          localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
+        }
+        
+        // Always merge extras with Supabase data
+        return {
+          ...data,
+          history: newExtras.history,
+          timeline: newExtras.timeline,
+          tagNumber: newExtras.tagNumber
+        };
       } catch (e) {
         console.error("Failed to update ticket:", e.message || e, e.details || '');
         Utils.showToast("שגיאה בעדכון התיקון", "error");
