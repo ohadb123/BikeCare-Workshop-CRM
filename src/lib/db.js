@@ -1,16 +1,107 @@
 export function createDB(sb, Utils) {
   /**
+   * Maps camelCase frontend field names to lowercase database column names
+   * PostgREST is case-sensitive and requires exact column name matches
+   */
+  const buildTicketPayload = (formState, isUpdate = false) => {
+    if (!formState || typeof formState !== 'object') return {};
+    
+    const payload = {};
+    
+    // Map camelCase to lowercase column names
+    if (formState.tagNumber !== undefined) payload.tagnumber = formState.tagNumber;
+    if (formState.ticketNumber !== undefined) payload.ticketnumber = formState.ticketNumber;
+    if (formState.customerName !== undefined) payload.customername = formState.customerName;
+    if (formState.customerPhone !== undefined) payload.customerphone = formState.customerPhone;
+    if (formState.customerEmail !== undefined) payload.customeremail = formState.customerEmail;
+    if (formState.bikeModel !== undefined) payload.bikemodel = formState.bikeModel;
+    if (formState.issueDescription !== undefined) payload.issuedescription = formState.issueDescription;
+    if (formState.status !== undefined) payload.status = formState.status;
+    if (formState.priority !== undefined) payload.priority = formState.priority;
+    if (formState.internalNotes !== undefined) payload.internalnotes = formState.internalNotes;
+    if (formState.is_archived !== undefined) payload.is_archived = formState.is_archived;
+    
+    // Handle jsonb fields - ensure they are proper JSON objects/arrays
+    if (formState.history !== undefined) {
+      if (typeof formState.history === 'string') {
+        try {
+          payload.history = JSON.parse(formState.history);
+        } catch (e) {
+          payload.history = [];
+        }
+      } else {
+        payload.history = Array.isArray(formState.history) ? formState.history : [];
+      }
+    }
+    
+    if (formState.quote !== undefined) {
+      if (typeof formState.quote === 'string') {
+        try {
+          payload.quote = JSON.parse(formState.quote);
+        } catch (e) {
+          payload.quote = null;
+        }
+      } else if (formState.quote === null) {
+        payload.quote = null;
+      } else {
+        payload.quote = formState.quote;
+      }
+    }
+    
+    // For updates: always set updatedAt, never include id or createdAt
+    if (isUpdate) {
+      payload.updatedat = new Date().toISOString();
+    } else {
+      // For inserts: include createdAt and updatedAt
+      payload.createdat = formState.createdAt || new Date().toISOString();
+      payload.updatedat = formState.updatedAt || new Date().toISOString();
+    }
+    
+    // Remove undefined values
+    Object.keys(payload).forEach(key => {
+      if (payload[key] === undefined) {
+        delete payload[key];
+      }
+    });
+    
+    return payload;
+  };
+
+  /**
+   * Maps lowercase database column names back to camelCase for frontend
+   */
+  const mapDbToFrontend = (dbRow) => {
+    if (!dbRow) return dbRow;
+    
+    return {
+      ...dbRow,
+      tagNumber: dbRow.tagnumber,
+      ticketNumber: dbRow.ticketnumber,
+      customerName: dbRow.customername,
+      customerPhone: dbRow.customerphone,
+      customerEmail: dbRow.customeremail,
+      bikeModel: dbRow.bikemodel,
+      issueDescription: dbRow.issuedescription,
+      internalNotes: dbRow.internalnotes,
+      is_archived: dbRow.is_archived,
+      createdAt: dbRow.createdat,
+      updatedAt: dbRow.updatedat,
+      // jsonb fields are already in correct format
+      history: dbRow.history || [],
+      quote: dbRow.quote || null
+    };
+  };
+
+  /**
    * Helper to remove fields that don't exist in Supabase schema
    * This prevents PGRST204 errors when these fields are accidentally included
-   * NOTE: history DOES exist in DB (jsonb), so we don't remove it
+   * NOTE: timeline doesn't exist in DB, stored in localStorage
    */
   const removeExtrasFromObject = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
     const clean = { ...obj };
-    // Remove timeline and tagNumber (they don't exist in DB, stored in localStorage)
-    // Keep history (it exists in DB as jsonb)
+    // Remove timeline (it doesn't exist in DB, stored in localStorage)
     delete clean.timeline;
-    delete clean.tagNumber;
     return clean;
   };
 
@@ -114,8 +205,8 @@ export function createDB(sb, Utils) {
       try {
         const { data, error } = await sb
           .from('tickets')
-          .select('*')
-          .order('createdAt', { ascending: false });
+          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
+          .order('createdat', { ascending: false });
 
         if (error) {
           console.error("Supabase Error:", error.message || error, error.details || '');
@@ -123,17 +214,16 @@ export function createDB(sb, Utils) {
           return [];
         }
 
-        // Ensure all tickets have default values for optional fields
+        // Map DB lowercase columns to camelCase frontend format
         // Merge with localStorage extras (timeline, tagNumber)
-        // history comes from DB, timeline/tagNumber from localStorage
-        return (data || []).map(t => {
-          const extras = JSON.parse(localStorage.getItem(`ticket_extras_${t.id}`) || '{}');
+        return (data || []).map(dbRow => {
+          const ticket = mapDbToFrontend(dbRow);
+          const extras = JSON.parse(localStorage.getItem(`ticket_extras_${ticket.id}`) || '{}');
           return {
-            ...t,
-            history: t.history || [],
+            ...ticket,
             timeline: extras.timeline || [],
-            tagNumber: extras.tagNumber !== undefined ? extras.tagNumber : null,
-            quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+            tagNumber: extras.tagNumber !== undefined ? extras.tagNumber : (ticket.tagNumber || null),
+            quote: ticket.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
           };
         });
       } catch (e) {
@@ -145,41 +235,22 @@ export function createDB(sb, Utils) {
 
     add: async (ticket) => {
       try {
-        // Extract fields that don't exist in Supabase schema (timeline, tagNumber)
-        // NOTE: history DOES exist in DB (jsonb), so we keep it
-        const { timeline, tagNumber, ...supabaseFields } = ticket;
+        // Extract timeline (doesn't exist in DB, stored in localStorage)
+        const { timeline, ...ticketForDb } = ticket;
         
-        // Remove immutable fields
-        const { id: _id, createdAt: _createdAt, ...mutableFields } = supabaseFields;
-        
-        // Clean any remaining extras that might have slipped through
-        const cleanFields = removeExtrasFromObject(mutableFields);
-        
-        // Ensure jsonb fields are proper JSON objects
-        if (cleanFields.history && typeof cleanFields.history === 'string') {
-          try {
-            cleanFields.history = JSON.parse(cleanFields.history);
-          } catch (e) {
-            console.warn('[DB.add] Failed to parse history as JSON:', e);
-            cleanFields.history = [];
-          }
-        }
-        if (cleanFields.quote && typeof cleanFields.quote === 'string') {
-          try {
-            cleanFields.quote = JSON.parse(cleanFields.quote);
-          } catch (e) {
-            console.warn('[DB.add] Failed to parse quote as JSON:', e);
-          }
-        }
-        
-        const newTicket = {
+        // Build payload with lowercase column names
+        const payload = buildTicketPayload({
+          ...ticketForDb,
           id: Utils.id(),
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          ...cleanFields
-        };
+          updatedAt: new Date().toISOString()
+        }, false);
 
-        const { data, error } = await sb.from('tickets').insert([newTicket]).select('id, createdAt, updatedAt, ticketNumber, customerName, customerPhone, customerEmail, bikeModel, issueDescription, status, priority, internalNotes, is_archived, history, quote').single();
+        const { data, error } = await sb
+          .from('tickets')
+          .insert([payload])
+          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
+          .single();
 
         if (error) {
           console.error("Error saving ticket:", error.message || error, error.details || '');
@@ -187,17 +258,17 @@ export function createDB(sb, Utils) {
           throw error;
         }
 
-        // Store timeline and tagNumber in localStorage (they don't exist in DB)
-        // history is stored in DB, so we get it from the response
+        // Store timeline in localStorage (it doesn't exist in DB)
         const extras = {
           timeline: timeline || [],
-          tagNumber: tagNumber || null
+          tagNumber: data.tagnumber || null
         };
         localStorage.setItem(`ticket_extras_${data.id}`, JSON.stringify(extras));
 
-        // Merge extras from localStorage with Supabase data
+        // Map DB response to frontend format and merge extras
+        const mappedTicket = mapDbToFrontend(data);
         return {
-          ...data,
+          ...mappedTicket,
           timeline: extras.timeline,
           tagNumber: extras.tagNumber
         };
@@ -217,55 +288,26 @@ export function createDB(sb, Utils) {
           throw new Error('Update blocked: not from explicit user action');
         }
 
-        // Extract fields that don't exist in Supabase schema (timeline, tagNumber)
-        // NOTE: history DOES exist in DB (jsonb), so we keep it
-        const { timeline, tagNumber, ...supabaseUpdates } = updates;
+        // Extract timeline (doesn't exist in DB, stored in localStorage)
+        const { timeline, ...updatesForDb } = updates;
         
-        // Remove immutable fields that should never be updated
-        const { id: _id, createdAt: _createdAt, ...mutableFields } = supabaseUpdates;
-        
-        // Clean any remaining extras that might have slipped through
-        const cleanUpdates = removeExtrasFromObject(mutableFields);
-        
-        // Ensure jsonb fields are proper JSON objects, not strings
-        const updateData = { ...cleanUpdates };
-        
-        // Convert history to proper JSON if it's a string
-        if (updateData.history && typeof updateData.history === 'string') {
-          try {
-            updateData.history = JSON.parse(updateData.history);
-          } catch (e) {
-            console.warn('[DB.update] Failed to parse history as JSON:', e);
-            delete updateData.history;
-          }
-        }
-        
-        // Convert quote to proper JSON if it's a string
-        if (updateData.quote && typeof updateData.quote === 'string') {
-          try {
-            updateData.quote = JSON.parse(updateData.quote);
-          } catch (e) {
-            console.warn('[DB.update] Failed to parse quote as JSON:', e);
-          }
-        }
-        
-        // Always set updatedAt
-        updateData.updatedAt = new Date().toISOString();
+        // Build payload with lowercase column names (excludes id, createdAt automatically)
+        const payload = buildTicketPayload(updatesForDb, true);
 
         // Log the payload before sending (for debugging)
         console.log('[DB.update] Sending PATCH:', {
           id,
-          payload: JSON.stringify(updateData),
-          payloadKeys: Object.keys(updateData)
+          payload: JSON.stringify(payload),
+          payloadKeys: Object.keys(payload)
         });
 
         // Enhanced error logging: capture full response details
-        // Use explicit column selection to avoid requesting non-existent columns
+        // Use explicit lowercase column selection
         const { data, error } = await sb
           .from('tickets')
-          .update(updateData)
+          .update(payload)
           .eq('id', id)
-          .select('id, createdAt, updatedAt, ticketNumber, customerName, customerPhone, customerEmail, bikeModel, issueDescription, status, priority, internalNotes, is_archived, history, quote')
+          .select('id, createdat, updatedat, ticketnumber, tagnumber, customername, customerphone, customeremail, bikemodel, issuedescription, status, priority, internalnotes, is_archived, history, quote')
           .single();
 
         if (error) {
@@ -277,8 +319,8 @@ export function createDB(sb, Utils) {
           const errorDetails = {
             method: 'PATCH',
             url: `${supabaseUrl}/rest/v1/tickets?id=eq.${id}`,
-            payload: JSON.stringify(updateData),
-            payloadKeys: Object.keys(updateData),
+            payload: JSON.stringify(payload),
+            payloadKeys: Object.keys(payload),
             status: error.status || 'unknown',
             message: error.message || String(error),
             details: error.details || null,
@@ -325,23 +367,22 @@ export function createDB(sb, Utils) {
           throw error;
         }
 
-        // Store timeline and tagNumber in localStorage (they don't exist in DB)
-        // history is stored in DB, so we get it from the response
+        // Store timeline in localStorage (it doesn't exist in DB)
         const existingExtras = JSON.parse(localStorage.getItem(`ticket_extras_${id}`) || '{}');
         const newExtras = {
           timeline: timeline !== undefined ? timeline : (existingExtras.timeline || []),
-          tagNumber: tagNumber !== undefined ? tagNumber : (existingExtras.tagNumber || null)
+          tagNumber: data.tagnumber || existingExtras.tagNumber || null
         };
         
-        // Update localStorage if extras were provided
-        if (timeline !== undefined || tagNumber !== undefined) {
+        // Update localStorage if timeline was provided
+        if (timeline !== undefined) {
           localStorage.setItem(`ticket_extras_${id}`, JSON.stringify(newExtras));
         }
         
-        // Merge extras from localStorage with Supabase data
-        // history comes from DB response, timeline/tagNumber from localStorage
+        // Map DB response to frontend format and merge extras
+        const mappedTicket = mapDbToFrontend(data);
         return {
-          ...data,
+          ...mappedTicket,
           timeline: newExtras.timeline,
           tagNumber: newExtras.tagNumber
         };
