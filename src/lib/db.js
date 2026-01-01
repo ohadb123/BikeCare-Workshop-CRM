@@ -27,27 +27,27 @@ export function createDB(sb, Utils) {
     // Map frontend input to actual database column names (case-sensitive)
     // NOTE: tagNumber is NOT accepted - frontend must use tagnumber
     const fieldMappings = {
-      // Accept camelCase input and map to actual DB column names
+      // Accept camelCase input and map to actual DB column names (camelCase)
       ticketNumber: 'ticketNumber',
-      ticketNumber: 'ticketNumber', // lowercase input -> camelCase DB
+      ticketnumber: 'ticketNumber', // lowercase input -> camelCase DB
       customerName: 'customerName',
-      customerName: 'customerName',
+      customername: 'customerName',
       customerPhone: 'customerPhone',
-      customerPhone: 'customerPhone',
+      customerphone: 'customerPhone',
       customerEmail: 'customerEmail',
-      customerEmail: 'customerEmail',
+      customeremail: 'customerEmail',
       bikeModel: 'bikeModel',
-      bikeModel: 'bikeModel',
+      bikemodel: 'bikeModel',
       issueDescription: 'issueDescription',
-      issueDescription: 'issueDescription',
+      issuedescription: 'issueDescription',
       internalNotes: 'internalNotes',
-      internalNotes: 'internalNotes',
-      // Accept lowercase for timestamp fields
+      internalnotes: 'internalNotes',
+      // Accept camelCase or lowercase for timestamp fields (DB uses lowercase)
       createdAt: 'createdat',
       createdat: 'createdat',
       updatedAt: 'updatedat',
       updatedat: 'updatedat',
-      // Accept lowercase for tagnumber
+      // Accept lowercase for tagnumber (DB uses lowercase)
       tagnumber: 'tagnumber'
     };
     
