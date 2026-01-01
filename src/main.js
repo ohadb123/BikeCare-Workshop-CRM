@@ -56,6 +56,7 @@ const DB = createDB(sb, Utils);
         started: false,
         listenersBound: false,
         refreshIntervalId: null,
+        allowRemoteWrites: false, // Guard: only true during explicit user actions
         
         // Cleanup function for memory leaks
         cleanup: () => {
@@ -803,14 +804,22 @@ const DB = createDB(sb, Utils);
                     tagNumber: container.querySelector('[data-field="tagNumber"]')?.value || ''
                 };
                 const newHistory = [...(window.app.currentTicket.history || []), { date: new Date().toISOString(), action: 'פרטים עודכנו', user: window.app.user ? window.app.user.email : 'צוות' }];
-                await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
-                window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
-                window.app.isEditingDetails = false;
-                window.app.renderTicketDetail();
-                Utils.showToast("הפרטים עודכנו בהצלחה");
+                
+                // Enable remote writes for explicit user action
+                window.app.allowRemoteWrites = true;
+                try {
+                    await DB.update(window.app.currentTicket.id, { ...updates, history: newHistory });
+                    window.app.currentTicket = { ...window.app.currentTicket, ...updates, history: newHistory };
+                    window.app.isEditingDetails = false;
+                    window.app.renderTicketDetail();
+                    Utils.showToast("הפרטים עודכנו בהצלחה");
+                } finally {
+                    window.app.allowRemoteWrites = false;
+                }
             } catch (error) {
                 console.error('Error saving ticket details:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בשמירת הפרטים', 'error');
+                window.app.allowRemoteWrites = false;
             }
         },
         
@@ -830,27 +839,44 @@ const DB = createDB(sb, Utils);
                     user: window.app.user ? window.app.user.email : 'טכנאי' 
                 };
                 const updatedTimeline = [newEntry, ...(window.app.currentTicket.timeline || [])];
-                await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
-                window.app.currentTicket.timeline = updatedTimeline;
-                form.reset();
-                window.app.renderTicketDetail();
-                Utils.showToast('הרישום נוסף בהצלחה');
+                
+                // Enable remote writes for explicit user action
+                window.app.allowRemoteWrites = true;
+                try {
+                    await DB.update(window.app.currentTicket.id, { timeline: updatedTimeline });
+                    window.app.currentTicket.timeline = updatedTimeline;
+                    form.reset();
+                    window.app.renderTicketDetail();
+                    Utils.showToast('הרישום נוסף בהצלחה');
+                } finally {
+                    window.app.allowRemoteWrites = false;
+                }
             } catch (error) {
                 console.error('Error adding timeline entry:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בהוספת רישום', 'error');
+                window.app.allowRemoteWrites = false;
             }
         },
 
         archiveTicket: async () => {
             if (!window.app.currentTicket || !confirm("האם אתה בטוח שברצונך להעביר את התיקון לארכיון?")) return;
             try {
-                await DB.update(window.app.currentTicket.id, { is_archived: true, status: 'archived' });
-                const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
-                if (ticketIndex > -1) { window.app.tickets[ticketIndex].is_archived = true; window.app.tickets[ticketIndex].status = 'archived'; }
-                window.app.currentTicket = null;
-                Utils.showToast("התיקון הועבר לארכיון בהצלחה");
-                router.navigate('tickets');
-            } catch (e) { Utils.showToast("שגיאה בארכוב", "error"); }
+                // Enable remote writes for explicit user action
+                window.app.allowRemoteWrites = true;
+                try {
+                    await DB.update(window.app.currentTicket.id, { is_archived: true, status: 'archived' });
+                    const ticketIndex = window.app.tickets.findIndex(t => t.id === window.app.currentTicket.id);
+                    if (ticketIndex > -1) { window.app.tickets[ticketIndex].is_archived = true; window.app.tickets[ticketIndex].status = 'archived'; }
+                    window.app.currentTicket = null;
+                    Utils.showToast("התיקון הועבר לארכיון בהצלחה");
+                    router.navigate('tickets');
+                } finally {
+                    window.app.allowRemoteWrites = false;
+                }
+            } catch (e) { 
+                Utils.showToast("שגיאה בארכוב", "error");
+                window.app.allowRemoteWrites = false;
+            }
         },
 
         deleteBike: () => {
@@ -931,11 +957,18 @@ const DB = createDB(sb, Utils);
                     Utils.showToast('אין תיקון פתוח', 'error');
                     return;
                 }
-                await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
-                Utils.showToast('השינויים נשמרו');
+                // Enable remote writes for explicit user action
+                window.app.allowRemoteWrites = true;
+                try {
+                    await DB.update(window.app.currentTicket.id, { quote: window.app.currentTicket.quote });
+                    Utils.showToast('השינויים נשמרו');
+                } finally {
+                    window.app.allowRemoteWrites = false;
+                }
             } catch (error) {
                 console.error('Error saving quote:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בשמירת הצעת המחיר', 'error');
+                window.app.allowRemoteWrites = false;
             }
         },
         
@@ -948,21 +981,29 @@ const DB = createDB(sb, Utils);
                 window.app.currentTicket.status = newStatus;
                 // סנכרון דגל הארכיון אם הסטטוס נבחר ידנית כ'בארכיון'
                 const isArchived = newStatus === 'archived';
-                await DB.update(window.app.currentTicket.id, { 
-                    status: newStatus,
-                    is_archived: isArchived 
-                });
-                // Refresh tickets list
-                const requestId = getRequestId();
-                const freshTickets = await DB.getAll();
-                if (requestId === currentRequestId && window.app.user) {
-                    window.app.tickets = freshTickets;
+                
+                // Enable remote writes for explicit user action
+                window.app.allowRemoteWrites = true;
+                try {
+                    await DB.update(window.app.currentTicket.id, { 
+                        status: newStatus,
+                        is_archived: isArchived 
+                    });
+                    // Refresh tickets list
+                    const requestId = getRequestId();
+                    const freshTickets = await DB.getAll();
+                    if (requestId === currentRequestId && window.app.user) {
+                        window.app.tickets = freshTickets;
+                    }
+                    window.app.renderTicketDetail(); 
+                    Utils.showToast('סטטוס עודכן');
+                } finally {
+                    window.app.allowRemoteWrites = false;
                 }
-                window.app.renderTicketDetail(); 
-                Utils.showToast('סטטוס עודכן');
             } catch (error) {
                 console.error('Error updating status:', error.message || error, error.details || '');
                 Utils.showToast('שגיאה בעדכון הסטטוס', 'error');
+                window.app.allowRemoteWrites = false;
             }
         },
 

@@ -58,7 +58,56 @@ export function createDB(sb, Utils) {
     }
   };
 
+  /**
+   * Get the actual tickets table schema from Supabase
+   * This helps verify which columns exist before making queries
+   */
+  const getTicketsSchema = async () => {
+    try {
+      // Query information_schema to get column details
+      const { data, error } = await sb.rpc('exec_sql', {
+        query: `
+          SELECT
+            column_name,
+            data_type,
+            is_nullable,
+            column_default
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'tickets'
+          ORDER BY ordinal_position;
+        `
+      }).catch(() => {
+        // If RPC doesn't exist, try direct query (may require service role)
+        return { data: null, error: { message: 'RPC not available, use SQL editor instead' } };
+      });
+
+      if (error) {
+        console.warn('[Schema] Could not fetch via RPC, use SQL editor with:', `
+          SELECT
+            column_name,
+            data_type,
+            is_nullable,
+            column_default
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'tickets'
+          ORDER BY ordinal_position;
+        `);
+        return null;
+      }
+
+      return data;
+    } catch (e) {
+      console.warn('[Schema] Schema fetch failed:', e);
+      return null;
+    }
+  };
+
   return {
+    // Expose schema getter for debugging
+    getSchema: getTicketsSchema,
+    
     getAll: async () => {
       if (!sb) return [];
       try {
@@ -139,6 +188,12 @@ export function createDB(sb, Utils) {
 
     update: async (id, updates) => {
       try {
+        // Guard: prevent automatic updates on page load
+        if (typeof window !== 'undefined' && window.app && !window.app.allowRemoteWrites) {
+          console.warn('[DB.update] Blocked: allowRemoteWrites is false. Update was triggered automatically.');
+          throw new Error('Update blocked: not from explicit user action');
+        }
+
         // Extract fields that don't exist in Supabase schema
         const { history, timeline, tagNumber, ...supabaseUpdates } = updates;
         
@@ -150,6 +205,7 @@ export function createDB(sb, Utils) {
           updatedAt: new Date().toISOString()
         };
 
+        // Enhanced error logging: capture full response details
         const { data, error } = await sb
           .from('tickets')
           .update(updateData)
@@ -158,7 +214,30 @@ export function createDB(sb, Utils) {
           .single();
 
         if (error) {
-          console.error("Update Error:", error.message || error, error.details || '');
+          // Log comprehensive error details
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'unknown';
+          const errorDetails = {
+            method: 'PATCH',
+            url: `${supabaseUrl}/rest/v1/tickets?id=eq.${id}`,
+            payload: JSON.stringify(updateData),
+            status: error.status || 'unknown',
+            message: error.message || String(error),
+            details: error.details || null,
+            hint: error.hint || null,
+            code: error.code || null
+          };
+          
+          console.error('[DB.update] Failed PATCH request:', errorDetails);
+          console.error('[DB.update] Full error object:', error);
+          
+          // Supabase JS client wraps errors, log all available properties
+          if (error.context) {
+            console.error('[DB.update] Error context:', error.context);
+          }
+          if (error.response) {
+            console.error('[DB.update] Error response object:', error.response);
+          }
+          
           Utils.showToast("שגיאה בעדכון", "error");
           throw error;
         }
