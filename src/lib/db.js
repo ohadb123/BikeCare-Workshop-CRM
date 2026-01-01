@@ -1,5 +1,19 @@
 export function createDB(sb, Utils) {
   /**
+   * Helper to remove fields that don't exist in Supabase schema
+   * This prevents PGRST204 errors when these fields are accidentally included
+   */
+  const removeExtrasFromObject = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    const clean = { ...obj };
+    // Explicitly remove these fields to prevent any chance of them being sent to Supabase
+    delete clean.history;
+    delete clean.timeline;
+    delete clean.tagNumber;
+    return clean;
+  };
+
+  /**
    * Migrate legacy localStorage data to Supabase on first load
    * This ensures data consistency and allows cleanup of localStorage
    */
@@ -83,11 +97,14 @@ export function createDB(sb, Utils) {
         // Extract fields that don't exist in Supabase schema
         const { history, timeline, tagNumber, ...supabaseFields } = ticket;
         
+        // Clean any remaining extras that might have slipped through
+        const cleanFields = removeExtrasFromObject(supabaseFields);
+        
         const newTicket = {
           id: Utils.id(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          ...supabaseFields
+          ...cleanFields
         };
 
         const { data, error } = await sb.from('tickets').insert([newTicket]).select().single();
@@ -125,8 +142,11 @@ export function createDB(sb, Utils) {
         // Extract fields that don't exist in Supabase schema
         const { history, timeline, tagNumber, ...supabaseUpdates } = updates;
         
+        // Clean any remaining extras that might have slipped through
+        const cleanUpdates = removeExtrasFromObject(supabaseUpdates);
+        
         const updateData = {
-          ...supabaseUpdates,
+          ...cleanUpdates,
           updatedAt: new Date().toISOString()
         };
 
