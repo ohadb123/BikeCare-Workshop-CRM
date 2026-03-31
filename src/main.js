@@ -473,7 +473,12 @@ const DB = createDB(sb, Utils);
                 window.app.updateLastUpdatedTimestamp();
 
                 if (reset) {
+                    // Always refresh the tickets table, then also re-render
+                    // whichever view is currently visible (dashboard on first load)
                     window.app.renderTickets();
+                    const currentView = document.querySelector('.view-section.active')?.id;
+                    if (currentView === 'view-dashboard') window.app.renderDashboard();
+                    if (currentView === 'view-archive')  window.app.renderArchive();
                 } else {
                     window.app.appendTicketRows(data);
                 }
@@ -543,7 +548,9 @@ const DB = createDB(sb, Utils);
             document.getElementById('stat-second_hand').innerText = counts.second_hand;
 
             // --- Pie Chart Rendering ---
-            const chartCtx = document.getElementById('dashboard-pie-chart').getContext('2d');
+            const chartCanvas = document.getElementById('dashboard-pie-chart');
+            if (!chartCanvas) return;
+            const chartCtx = chartCanvas.getContext('2d');
             
             const dataMap = [
                 { label: 'חדש', value: counts.new, color: STATUS_COLORS.new },
