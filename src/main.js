@@ -61,11 +61,22 @@ const DB = createDB(sb, Utils);
         _focusFetchListener: null,
         _lastFetchTs: 0,
 
+        // Pagination state
+        _ticketsOffset: 0,
+        _ticketsHasMore: true,
+        _ticketsLoading: false,
+        _ticketsSearchTerm: '',
+        _scrollObserver: null,
+
         // Cleanup function for memory leaks
         cleanup: () => {
             if (window.app._focusFetchListener) {
                 document.removeEventListener('visibilitychange', window.app._focusFetchListener);
                 window.app._focusFetchListener = null;
+            }
+            if (window.app._scrollObserver) {
+                window.app._scrollObserver.disconnect();
+                window.app._scrollObserver = null;
             }
             if (window.app.chartInstance) {
                 try {
@@ -153,44 +164,26 @@ const DB = createDB(sb, Utils);
                 if (loginScreen) loginScreen.style.display = 'none';
                 if (appContainer) appContainer.classList.remove('hidden');
                 
-                // Fetch data with race condition protection
-                const requestId = getRequestId();
-                const [ticketsData, bikesData] = await Promise.all([
-                    DB.getAll(),
-                    Promise.resolve(BikeDB.getAll())
-                ]);
-                
-                // Only update if this is still the latest request and user is still logged in
-                if (requestId === currentRequestId && window.app.user) {
-                    window.app.tickets = ticketsData || [];
-                    window.app.bikes = bikesData || [];
-                }
+                // Bikes are local — load synchronously
+                window.app.bikes = BikeDB.getAll();
 
                 window.app.setupListeners();
                 router.navigate('dashboard');
-                window.app.updateLastUpdatedTimestamp();
 
-                // Record when we last fetched so the focus listener doesn't re-fetch immediately
-                window.app._lastFetchTs = Date.now();
+                // Initial ticket fetch (first page, 50 items)
+                await window.app.loadTickets(true);
 
-                // Fetch-on-focus: refetch when user returns to this tab, with a 15s debounce
+                // Fetch-on-focus: reset to first page only (saves egress), 15s debounce
                 if (!window.app._focusFetchListener) {
                     window.app._focusFetchListener = async () => {
                         if (document.visibilityState !== 'visible') return;
                         if (!window.app.user || !window.app.started) return;
                         if (Date.now() - window.app._lastFetchTs < 15000) return;
-                        window.app._lastFetchTs = Date.now();
-                        const requestId = getRequestId();
                         try {
-                            const freshData = await DB.getAll();
-                            if (requestId === currentRequestId && window.app.user) {
-                                window.app.tickets = freshData || [];
-                                window.app.updateLastUpdatedTimestamp();
-                                const currentView = document.querySelector('.view-section.active')?.id;
-                                if (currentView === 'view-dashboard') window.app.renderDashboard();
-                                if (currentView === 'view-tickets') window.app.renderTickets();
-                                if (currentView === 'view-archive') window.app.renderArchive();
-                            }
+                            await window.app.loadTickets(true);
+                            const currentView = document.querySelector('.view-section.active')?.id;
+                            if (currentView === 'view-dashboard') window.app.renderDashboard();
+                            if (currentView === 'view-archive') window.app.renderArchive();
                         } catch (e) {
                             console.error('Focus fetch error:', e);
                         }
@@ -234,8 +227,29 @@ const DB = createDB(sb, Utils);
             if (window.app.listenersBound) return;
             window.app.listenersBound = true;
 
-            document.getElementById('tickets-search').addEventListener('input', window.app.renderTickets);
+            // Search: debounce 500ms → server-side fetch reset
+            let _searchTimer = null;
+            document.getElementById('tickets-search').addEventListener('input', (e) => {
+                clearTimeout(_searchTimer);
+                _searchTimer = setTimeout(() => {
+                    window.app._ticketsSearchTerm = e.target.value.trim();
+                    window.app.loadTickets(true);
+                }, 500);
+            });
+
+            // Status / priority filters: client-side re-render only
             document.getElementById('tickets-filter').addEventListener('change', window.app.renderTickets);
+            document.getElementById('priority-filter').addEventListener('change', window.app.renderTickets);
+
+            // Infinite scroll sentinel
+            const sentinel = document.getElementById('tickets-sentinel');
+            if (sentinel && 'IntersectionObserver' in window) {
+                window.app._scrollObserver = new IntersectionObserver(
+                    (entries) => { if (entries[0].isIntersecting) window.app.loadTickets(false); },
+                    { threshold: 0.1 }
+                );
+                window.app._scrollObserver.observe(sentinel);
+            }
             const custSearch = document.getElementById('customers-search');
             if(custSearch) custSearch.addEventListener('input', window.app.renderCustomers);
             
@@ -268,16 +282,10 @@ const DB = createDB(sb, Utils);
                         history: [{date: new Date().toISOString(), action: 'נוצר', user: window.app.user?.email || 'מערכת'}]
                     });
                     
-                    // Refresh tickets with race condition protection
-                    const requestId = getRequestId();
-                    const freshTickets = await DB.getAll();
-                    if (requestId === currentRequestId && window.app.user) {
-                        window.app.tickets = freshTickets;
-                    }
-                    
                     e.target.reset();
                     Utils.showToast('כרטיס נפתח בהצלחה');
                     router.navigate('tickets');
+                    await window.app.loadTickets(true);
                 } catch(err) {
                     console.error('Error creating ticket:', err);
                     Utils.showToast('שגיאה בפתיחת כרטיס', 'error');
@@ -425,24 +433,89 @@ const DB = createDB(sb, Utils);
             const btn = document.getElementById('manual-refresh-btn');
             if (btn) btn.disabled = true;
             try {
-                const requestId = getRequestId();
-                const freshData = await DB.getAll();
-                if (requestId === currentRequestId && window.app.user) {
-                    window.app.tickets = freshData || [];
-                    window.app._lastFetchTs = Date.now();
-                    window.app.updateLastUpdatedTimestamp();
-                    const currentView = document.querySelector('.view-section.active')?.id;
-                    if (currentView === 'view-dashboard') window.app.renderDashboard();
-                    if (currentView === 'view-tickets') window.app.renderTickets();
-                    if (currentView === 'view-archive') window.app.renderArchive();
-                    Utils.showToast('הנתונים עודכנו', 'success');
-                }
+                await window.app.loadTickets(true);
+                const currentView = document.querySelector('.view-section.active')?.id;
+                if (currentView === 'view-dashboard') window.app.renderDashboard();
+                if (currentView === 'view-archive') window.app.renderArchive();
+                Utils.showToast('הנתונים עודכנו', 'success');
             } catch (e) {
                 console.error('Manual refresh error:', e);
                 Utils.showToast('שגיאה ברענון הנתונים', 'error');
             } finally {
                 if (btn) btn.disabled = false;
             }
+        },
+
+        // ── Pagination helpers ──────────────────────────────────────────────
+        loadTickets: async (reset = false) => {
+            if (!reset && (window.app._ticketsLoading || !window.app._ticketsHasMore)) return;
+            window.app._ticketsLoading = true;
+
+            const limit  = reset ? 50 : 20;
+            const offset = reset ? 0  : window.app._ticketsOffset;
+
+            try {
+                const requestId = getRequestId();
+                const data = await DB.getAll({ limit, offset, searchTerm: window.app._ticketsSearchTerm });
+
+                if (requestId !== currentRequestId || !window.app.user) return;
+
+                if (reset) {
+                    window.app.tickets = data;
+                    window.app._ticketsOffset = data.length;
+                } else {
+                    window.app.tickets = [...window.app.tickets, ...data];
+                    window.app._ticketsOffset += data.length;
+                }
+
+                window.app._ticketsHasMore = data.length >= limit;
+                window.app._lastFetchTs = Date.now();
+                window.app.updateLastUpdatedTimestamp();
+
+                if (reset) {
+                    window.app.renderTickets();
+                } else {
+                    window.app.appendTicketRows(data);
+                }
+            } catch (e) {
+                console.error('loadTickets error:', e);
+            } finally {
+                window.app._ticketsLoading = false;
+            }
+        },
+
+        appendTicketRows: (newData) => {
+            const filter         = document.getElementById('tickets-filter')?.value || 'all';
+            const priorityFilter = document.getElementById('priority-filter')?.value || 'all';
+
+            const filtered = newData.filter(t => {
+                if (t.is_archived) return false;
+                const matchFilter   = filter === 'all'         || t.status   === filter;
+                const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
+                return matchFilter && matchPriority;
+            });
+
+            const tbody = document.getElementById('tickets-table-body');
+            if (!tbody || filtered.length === 0) return;
+
+            tbody.insertAdjacentHTML('beforeend', filtered.map(t => {
+                const safeId           = window.app.safeAttr(t.id);
+                const safeTicketNumber = window.app.safeHtml(t.ticketNumber);
+                const safeCustomerName = window.app.safeHtml(t.customerName || '');
+                const safeCustomerPhone = window.app.safeHtml(t.customerPhone || '');
+                const safeBikeModel    = window.app.safeHtml(t.bikeModel || '');
+                return `
+                <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
+                    <td class="p-4 font-mono font-bold text-blue-600">#${safeTicketNumber}</td>
+                    <td class="p-4 font-medium">${safeCustomerName}</td>
+                    <td class="p-4 hidden md:table-cell text-gray-600">${safeCustomerPhone}</td>
+                    <td class="p-4 text-gray-800">${safeBikeModel}</td>
+                    <td class="p-4">${window.app.getStatusBadge(t.status)}</td>
+                    <td class="p-4 hidden md:table-cell">${window.app.getPriorityLabel(t.priority)}</td>
+                    <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdat)}</td>
+                </tr>`;
+            }).join(''));
+            lucide.createIcons();
         },
 
         renderDashboard: () => {
@@ -610,31 +683,26 @@ const DB = createDB(sb, Utils);
         },
 
         renderTickets: () => {
-            const searchInput = document.getElementById('tickets-search');
-            if (!searchInput) return;
-            const search = searchInput.value.toLowerCase();
-            const filter = document.getElementById('tickets-filter').value;
+            if (!document.getElementById('tickets-search')) return;
+            const filter         = document.getElementById('tickets-filter').value;
             const priorityFilter = document.getElementById('priority-filter').value;
-            
+
+            // Text search is server-side; only apply status/priority filters client-side
             let filtered = window.app.tickets.filter(t => {
                 if (t.is_archived) return false;
-                const matchSearch = (t.customerName || '').toLowerCase().includes(search) || 
-                                    (t.ticketNumber || '').toString().includes(search) || 
-                                    (t.bikeModel || '').toLowerCase().includes(search) ||
-                                    (t.tagNumber || '').toString().includes(search);
-                const matchFilter = filter === 'all' || t.status === filter;
+                const matchFilter   = filter === 'all'         || t.status   === filter;
                 const matchPriority = priorityFilter === 'all' || t.priority === priorityFilter;
-                return matchSearch && matchFilter && matchPriority;
+                return matchFilter && matchPriority;
             });
 
             const { field, dir } = window.app.sortState;
             filtered.sort((a, b) => {
                 let valA = a[field], valB = b[field];
-                if (field === 'priority') { valA = window.app.getPriorityValue(valA); valB = window.app.getPriorityValue(valB); }
-                else if (field === 'createdAt') { valA = new Date(valA); valB = new Date(valB); }
+                if (field === 'priority')  { valA = window.app.getPriorityValue(valA); valB = window.app.getPriorityValue(valB); }
+                else if (field === 'createdAt') { valA = new Date(a.createdat); valB = new Date(b.createdat); }
                 else if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
                 if (valA < valB) return dir === 'asc' ? -1 : 1;
-                if (valA > valB) return dir === 'asc' ? 1 : -1;
+                if (valA > valB) return dir === 'asc' ? 1  : -1;
                 return 0;
             });
 
@@ -656,11 +724,11 @@ const DB = createDB(sb, Utils);
             }
 
             tbody.innerHTML = filtered.map(t => {
-                const safeId = window.app.safeAttr(t.id);
-                const safeTicketNumber = window.app.safeHtml(t.ticketNumber);
-                const safeCustomerName = window.app.safeHtml(t.customerName || '');
+                const safeId            = window.app.safeAttr(t.id);
+                const safeTicketNumber  = window.app.safeHtml(t.ticketNumber);
+                const safeCustomerName  = window.app.safeHtml(t.customerName || '');
                 const safeCustomerPhone = window.app.safeHtml(t.customerPhone || '');
-                const safeBikeModel = window.app.safeHtml(t.bikeModel || '');
+                const safeBikeModel     = window.app.safeHtml(t.bikeModel || '');
                 return `
                 <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
                     <td class="p-4 font-mono font-bold text-blue-600">#${safeTicketNumber}</td>
@@ -669,9 +737,8 @@ const DB = createDB(sb, Utils);
                     <td class="p-4 text-gray-800">${safeBikeModel}</td>
                     <td class="p-4">${window.app.getStatusBadge(t.status)}</td>
                     <td class="p-4 hidden md:table-cell">${window.app.getPriorityLabel(t.priority)}</td>
-                    <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdAt)}</td>
-                </tr>
-            `;
+                    <td class="p-4 text-gray-500 text-sm">${Utils.formatDate(t.createdat)}</td>
+                </tr>`;
             }).join('');
         },
         
@@ -997,12 +1064,8 @@ const DB = createDB(sb, Utils);
                     status: newStatus,
                     is_archived: isArchived 
                 });
-                // Refresh tickets list
-                const requestId = getRequestId();
-                const freshTickets = await DB.getAll();
-                if (requestId === currentRequestId && window.app.user) {
-                    window.app.tickets = freshTickets;
-                }
+                // Refresh tickets list (reset pagination)
+                await window.app.loadTickets(true);
                 window.app.renderTicketDetail(); 
                 Utils.showToast('סטטוס עודכן');
             } catch (error) {

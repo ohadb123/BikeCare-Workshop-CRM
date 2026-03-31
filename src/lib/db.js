@@ -51,14 +51,24 @@ export function createDB(sb, Utils) {
   };
 
   return {
-    getAll: async () => {
+    getAll: async ({ limit = 50, offset = 0, searchTerm = '' } = {}) => {
       if (!sb) return [];
       try {
-        const { data, error } = await sb
+        let query = sb
           .from('tickets')
           .select('*')
           .order('createdat', { ascending: false })
-          .limit(20);
+          .range(offset, offset + limit - 1);
+
+        if (searchTerm) {
+          // Escape special PostgREST pattern characters
+          const escaped = searchTerm.replace(/[%_*]/g, '\\$&');
+          query = query.or(
+            `ticketnumber.ilike.%${escaped}%,customername.ilike.%${escaped}%,bikemodel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
+          );
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error("Supabase Error:", error);
@@ -66,7 +76,7 @@ export function createDB(sb, Utils) {
           return [];
         }
 
-        // Strip heavy JSON columns from the list — they are fetched on demand via getById
+        // Strip heavy JSON columns from the list — fetched on demand via getById
         return (data || []).map(({ history, timeline, ...t }) => ({
           ...t,
           quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
