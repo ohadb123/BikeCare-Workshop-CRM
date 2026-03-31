@@ -56,7 +56,7 @@ export function createDB(sb, Utils) {
       try {
         const { data, error } = await sb
           .from('tickets')
-          .select('id, ticketNumber, customerName, customerPhone, bikeModel, status, priority, is_archived, tagNumber, issueDescription, quote, createdAt, updatedAt')
+          .select('*')
           .order('createdAt', { ascending: false })
           .limit(20);
 
@@ -66,7 +66,8 @@ export function createDB(sb, Utils) {
           return [];
         }
 
-        return (data || []).map(t => ({
+        // Strip heavy JSON columns from the list — they are fetched on demand via getById
+        return (data || []).map(({ history, timeline, ...t }) => ({
           ...t,
           quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
         }));

@@ -164,11 +164,11 @@ const DB = createDB(sb, Utils);
                 if (requestId === currentRequestId && window.app.user) {
                     window.app.tickets = ticketsData || [];
                     window.app.bikes = bikesData || [];
-                    window.app.updateLastUpdatedTimestamp();
                 }
-                
+
                 window.app.setupListeners();
                 router.navigate('dashboard');
+                window.app.updateLastUpdatedTimestamp();
 
                 // Record when we last fetched so the focus listener doesn't re-fetch immediately
                 window.app._lastFetchTs = Date.now();
@@ -409,10 +409,16 @@ const DB = createDB(sb, Utils);
         },
         
         updateLastUpdatedTimestamp: () => {
-            const el = document.getElementById('last-updated-indicator');
-            if (!el) return;
-            const time = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
-            el.textContent = `עודכן לאחרונה: ${time}`;
+            try {
+                const el = document.getElementById('last-updated-indicator');
+                if (!el) return;
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                el.textContent = `עודכן לאחרונה: ${hh}:${mm}`;
+            } catch (e) {
+                console.warn('Could not update last-updated indicator:', e);
+            }
         },
 
         manualRefresh: async () => {
