@@ -33,7 +33,7 @@ export function createDB(sb, Utils) {
               history: extras.history || null,
               timeline: extras.timeline || null,
               tagNumber: extras.tagNumber || null,
-              updatedAt: new Date().toISOString()
+              updatedat: new Date().toISOString()
             };
             
             const { error } = await sb.from('tickets').update(updateData).eq('id', ticketId);
@@ -57,7 +57,7 @@ export function createDB(sb, Utils) {
         const { data, error } = await sb
           .from('tickets')
           .select('*')
-          .order('createdAt', { ascending: false })
+          .order('createdat', { ascending: false })
           .limit(20);
 
         if (error) {
@@ -108,8 +108,8 @@ export function createDB(sb, Utils) {
       try {
         const newTicket = {
           id: Utils.id(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdat: new Date().toISOString(),
+          updatedat: new Date().toISOString(),
           // Store all fields including history, timeline, tagNumber in Supabase
           history: ticket.history || [],
           timeline: ticket.timeline || [],
@@ -137,7 +137,7 @@ export function createDB(sb, Utils) {
       try {
         const updateData = {
           ...updates,
-          updatedAt: new Date().toISOString()
+          updatedat: new Date().toISOString()
         };
 
         const { data, error } = await sb
