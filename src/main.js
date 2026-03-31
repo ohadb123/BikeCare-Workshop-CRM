@@ -58,13 +58,14 @@ const DB = createDB(sb, Utils);
         // Flags
         started: false,
         listenersBound: false,
-        refreshIntervalId: null,
-        
+        _focusFetchListener: null,
+        _lastFetchTs: 0,
+
         // Cleanup function for memory leaks
         cleanup: () => {
-            if (window.app.refreshIntervalId) {
-                clearInterval(window.app.refreshIntervalId);
-                window.app.refreshIntervalId = null;
+            if (window.app._focusFetchListener) {
+                document.removeEventListener('visibilitychange', window.app._focusFetchListener);
+                window.app._focusFetchListener = null;
             }
             if (window.app.chartInstance) {
                 try {
@@ -163,36 +164,39 @@ const DB = createDB(sb, Utils);
                 if (requestId === currentRequestId && window.app.user) {
                     window.app.tickets = ticketsData || [];
                     window.app.bikes = bikesData || [];
+                    window.app.updateLastUpdatedTimestamp();
                 }
                 
                 window.app.setupListeners();
                 router.navigate('dashboard');
-                
-                // Setup refresh interval with race condition protection
-                window.app.refreshIntervalId = setInterval(async () => {
-                    if (document.visibilityState === 'visible' && window.app.user) {
-                        const refreshRequestId = getRequestId();
+
+                // Record when we last fetched so the focus listener doesn't re-fetch immediately
+                window.app._lastFetchTs = Date.now();
+
+                // Fetch-on-focus: refetch when user returns to this tab, with a 15s debounce
+                if (!window.app._focusFetchListener) {
+                    window.app._focusFetchListener = async () => {
+                        if (document.visibilityState !== 'visible') return;
+                        if (!window.app.user || !window.app.started) return;
+                        if (Date.now() - window.app._lastFetchTs < 15000) return;
+                        window.app._lastFetchTs = Date.now();
+                        const requestId = getRequestId();
                         try {
                             const freshData = await DB.getAll();
-                            
-                            // Only update if this is still the latest request and user is still logged in
-                            if (refreshRequestId === currentRequestId && window.app.user) {
-                                const lengthChanged = freshData.length !== window.app.tickets.length;
+                            if (requestId === currentRequestId && window.app.user) {
                                 window.app.tickets = freshData || [];
-                                
-                                if (lengthChanged) {
-                                    const currentView = document.querySelector('.view-section.active')?.id;
-                                    if (currentView === 'view-dashboard') window.app.renderDashboard();
-                                    if (currentView === 'view-tickets') window.app.renderTickets();
-                                    if (currentView === 'view-archive') window.app.renderArchive();
-                                }
+                                window.app.updateLastUpdatedTimestamp();
+                                const currentView = document.querySelector('.view-section.active')?.id;
+                                if (currentView === 'view-dashboard') window.app.renderDashboard();
+                                if (currentView === 'view-tickets') window.app.renderTickets();
+                                if (currentView === 'view-archive') window.app.renderArchive();
                             }
-                        } catch (error) {
-                            console.error('Error refreshing data:', error);
-                            // Don't show toast on every refresh error to avoid spam
+                        } catch (e) {
+                            console.error('Focus fetch error:', e);
                         }
-                    }
-                }, 10000);
+                    };
+                    document.addEventListener('visibilitychange', window.app._focusFetchListener);
+                }
             } catch (error) {
                 console.error('Error starting app:', error);
                 Utils.showToast('שגיאה בהפעלת האפליקציה', 'error');
@@ -404,6 +408,37 @@ const DB = createDB(sb, Utils);
             return Utils.escapeAttr(String(str));
         },
         
+        updateLastUpdatedTimestamp: () => {
+            const el = document.getElementById('last-updated-indicator');
+            if (!el) return;
+            const time = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', hour12: false });
+            el.textContent = `עודכן לאחרונה: ${time}`;
+        },
+
+        manualRefresh: async () => {
+            const btn = document.getElementById('manual-refresh-btn');
+            if (btn) btn.disabled = true;
+            try {
+                const requestId = getRequestId();
+                const freshData = await DB.getAll();
+                if (requestId === currentRequestId && window.app.user) {
+                    window.app.tickets = freshData || [];
+                    window.app._lastFetchTs = Date.now();
+                    window.app.updateLastUpdatedTimestamp();
+                    const currentView = document.querySelector('.view-section.active')?.id;
+                    if (currentView === 'view-dashboard') window.app.renderDashboard();
+                    if (currentView === 'view-tickets') window.app.renderTickets();
+                    if (currentView === 'view-archive') window.app.renderArchive();
+                    Utils.showToast('הנתונים עודכנו', 'success');
+                }
+            } catch (e) {
+                console.error('Manual refresh error:', e);
+                Utils.showToast('שגיאה ברענון הנתונים', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        },
+
         renderDashboard: () => {
             // סינון ארכיון מהדשבורד (גם לפי דגל וגם לפי סטטוס)
             const t = window.app.tickets.filter(x => !x.is_archived && x.status !== 'archived');
@@ -776,15 +811,16 @@ const DB = createDB(sb, Utils);
             lucide.createIcons();
         },
 
-        openTicket: (id) => {
-            const ticket = window.app.tickets.find(t => t.id === id);
+        openTicket: async (id) => {
+            const full = await DB.getById(id);
+            const ticket = full || window.app.tickets.find(t => t.id === id);
             if(!ticket) return;
             if (!ticket.quote) ticket.quote = { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false };
             window.app.currentTicket = ticket;
-            window.app.isEditingDetails = false; 
-            window.app.activeTicketTab = 'details'; 
-            router.navigate('ticket-detail'); 
-            window.app.renderTicketDetail(); 
+            window.app.isEditingDetails = false;
+            window.app.activeTicketTab = 'details';
+            router.navigate('ticket-detail');
+            window.app.renderTicketDetail();
         },
 
         switchTicketTab: (tabName) => { window.app.activeTicketTab = tabName; window.app.renderTicketDetail(); },
@@ -1033,13 +1069,7 @@ window.addEventListener('beforeunload', () => {
     window.app.cleanup();
 });
 
-// Cleanup on visibility change (when tab is hidden)
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        // Optionally pause refresh interval when tab is hidden
-        // The interval already checks visibilityState, so this is just for cleanup
-    }
-});
+// Note: fetch-on-focus is registered per-session inside startApp via window.app._focusFetchListener
 
 // Init with DOMContentLoaded
 document.addEventListener("DOMContentLoaded", () => window.app.init());

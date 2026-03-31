@@ -56,8 +56,9 @@ export function createDB(sb, Utils) {
       try {
         const { data, error } = await sb
           .from('tickets')
-          .select('*')
-          .order('createdAt', { ascending: false });
+          .select('id, ticketNumber, customerName, customerPhone, bikeModel, status, priority, is_archived, tagNumber, issueDescription, quote, createdAt, updatedAt')
+          .order('createdAt', { ascending: false })
+          .limit(20);
 
         if (error) {
           console.error("Supabase Error:", error);
@@ -65,17 +66,40 @@ export function createDB(sb, Utils) {
           return [];
         }
 
-        // Ensure all tickets have default values for optional fields
         return (data || []).map(t => ({
           ...t,
-          history: t.history || [],
-          timeline: t.timeline || [],
           quote: t.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
         }));
       } catch (e) {
         console.error("DB Connection Error:", e);
         Utils.showToast("שגיאה בחיבור למסד הנתונים", "error");
         return [];
+      }
+    },
+
+    getById: async (id) => {
+      if (!sb) return null;
+      try {
+        const { data, error } = await sb
+          .from('tickets')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) {
+          console.error("Supabase Error:", error);
+          return null;
+        }
+
+        return {
+          ...data,
+          history: data.history || [],
+          timeline: data.timeline || [],
+          quote: data.quote || { items: [], discount: 0, subtotal: 0, total: 0, signature: null, isSigned: false }
+        };
+      } catch (e) {
+        console.error("DB Connection Error:", e);
+        return null;
       }
     },
 

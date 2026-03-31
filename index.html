@@ -131,6 +131,9 @@
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
 
+    <!-- Last Updated Indicator -->
+    <div id="last-updated-indicator" style="position:fixed;top:10px;left:10px;font-size:12px;color:#666;background:rgba(255,255,255,0.75);padding:2px 8px;border-radius:4px;direction:rtl;z-index:9999;pointer-events:none;"></div>
+
     <!-- LOGIN SCREEN -->
     <div id="login-screen">
         <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
@@ -317,9 +320,14 @@
                 <div id="view-tickets" class="view-section">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <h2 class="text-2xl font-bold text-gray-800">ניהול תיקונים</h2>
-                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
-                            <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button id="manual-refresh-btn" onclick="window.app.manualRefresh()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-200 shadow-sm disabled:opacity-50">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i> רענן
+                            </button>
+                            <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm">
+                                <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
+                            </button>
+                        </div>
                     </div>
 
                     <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4 flex-wrap">
