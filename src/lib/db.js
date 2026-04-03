@@ -64,7 +64,7 @@ export function createDB(sb, Utils) {
           // Escape special PostgREST pattern characters
           const escaped = searchTerm.replace(/[%_*]/g, '\\$&');
           query = query.or(
-            `ticketNumber.ilike.%${escaped}%,customerName.ilike.%${escaped}%,bikeModel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
+            `ticketNumber::text.ilike.%${escaped}%,customerName.ilike.%${escaped}%,bikeModel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
           );
         }
 
