@@ -116,15 +116,18 @@ export function createDB(sb, Utils) {
 
     add: async (ticket) => {
       try {
+        const { ticketNumber, customerName, bikeModel, tagNumber, ...rest } = ticket;
         const newTicket = {
           id: Utils.id(),
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
-          // Store all fields including history, timeline, tagNumber in Supabase
           history: ticket.history || [],
           timeline: ticket.timeline || [],
-          tagNumber: ticket.tagNumber || null,
-          ...ticket
+          ...rest,
+          ticketnumber: ticketNumber ?? rest.ticketnumber,
+          customername: customerName ?? rest.customername,
+          bikemodel: bikeModel ?? rest.bikemodel,
+          tagnumber: tagNumber ?? rest.tagnumber ?? null,
         };
 
         const { data, error } = await sb.from('tickets').insert([newTicket]).select().single();
@@ -145,9 +148,14 @@ export function createDB(sb, Utils) {
 
     update: async (id, updates) => {
       try {
+        const { ticketNumber, customerName, bikeModel, tagNumber, ...rest } = updates;
         const updateData = {
-          ...updates,
-          updatedat: new Date().toISOString()
+          ...rest,
+          updatedat: new Date().toISOString(),
+          ...(ticketNumber !== undefined && { ticketnumber: ticketNumber }),
+          ...(customerName !== undefined && { customername: customerName }),
+          ...(bikeModel !== undefined && { bikemodel: bikeModel }),
+          ...(tagNumber !== undefined && { tagnumber: tagNumber }),
         };
 
         const { data, error } = await sb
