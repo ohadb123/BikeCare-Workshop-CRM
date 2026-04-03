@@ -61,11 +61,16 @@ export function createDB(sb, Utils) {
           .range(offset, offset + limit - 1);
 
         if (searchTerm) {
-          // Escape special PostgREST pattern characters
-          const escaped = searchTerm.replace(/[%_*]/g, '\\$&');
-          query = query.or(
-            `ticketNumber::text.ilike.%${escaped}%,customerName.ilike.%${escaped}%,bikeModel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
-          );
+          const term = searchTerm.trim();
+          const isNumeric = /^\d+$/.test(term);
+
+          let orQuery = `customername.ilike.%${term}%,bikemodel.ilike.%${term}%,tagnumber.ilike.%${term}%,customerphone.ilike.%${term}%`;
+
+          if (isNumeric) {
+            orQuery += `,ticketnumber.eq.${term}`;
+          }
+
+          query = query.or(orQuery);
         }
 
         const { data, error } = await query;
