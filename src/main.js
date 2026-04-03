@@ -512,6 +512,7 @@ const DB = createDB(sb, Utils);
                 return `
                 <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
                     <td class="p-4 font-mono font-bold text-blue-600">#${safeTicketNumber}</td>
+                    <td class="p-4 font-medium text-gray-700">${t.tagnumber || '-'}</td>
                     <td class="p-4 font-medium">${safeCustomerName}</td>
                     <td class="p-4 hidden md:table-cell text-gray-600">${safeCustomerPhone}</td>
                     <td class="p-4 text-gray-800">${safeBikeModel}</td>
@@ -726,7 +727,7 @@ const DB = createDB(sb, Utils);
 
             const tbody = document.getElementById('tickets-table-body');
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">לא נמצאו תיקונים</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-500">לא נמצאו תיקונים</td></tr>`;
                 return;
             }
 
@@ -739,6 +740,7 @@ const DB = createDB(sb, Utils);
                 return `
                 <tr class="hover:bg-blue-50 cursor-pointer border-b border-gray-100" onclick="window.app.openTicket('${safeId}')">
                     <td class="p-4 font-mono font-bold text-blue-600">#${safeTicketNumber}</td>
+                    <td class="p-4 font-medium text-gray-700">${t.tagnumber || '-'}</td>
                     <td class="p-4 font-medium">${safeCustomerName}</td>
                     <td class="p-4 hidden md:table-cell text-gray-600">${safeCustomerPhone}</td>
                     <td class="p-4 text-gray-800">${safeBikeModel}</td>
