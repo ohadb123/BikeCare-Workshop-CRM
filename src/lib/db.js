@@ -32,7 +32,7 @@ export function createDB(sb, Utils) {
             const updateData = {
               history: extras.history || null,
               timeline: extras.timeline || null,
-              tagNumber: extras.tagNumber || null,
+              tagnumber: extras.tagnumber || extras.tagNumber || null,
               updatedat: new Date().toISOString()
             };
             
@@ -64,7 +64,7 @@ export function createDB(sb, Utils) {
           // Escape special PostgREST pattern characters
           const escaped = searchTerm.replace(/[%_*]/g, '\\$&');
           query = query.or(
-            `ticketnumber.ilike.%${escaped}%,customername.ilike.%${escaped}%,bikemodel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
+            `ticketNumber.ilike.%${escaped}%,customerName.ilike.%${escaped}%,bikeModel.ilike.%${escaped}%,tagnumber.ilike.%${escaped}%`
           );
         }
 
@@ -116,17 +116,14 @@ export function createDB(sb, Utils) {
 
     add: async (ticket) => {
       try {
-        const { ticketNumber, customerName, bikeModel, tagNumber, ...rest } = ticket;
+        const { tagNumber, ...rest } = ticket;
         const newTicket = {
           id: Utils.id(),
           createdat: new Date().toISOString(),
           updatedat: new Date().toISOString(),
-          history: ticket.history || [],
-          timeline: ticket.timeline || [],
           ...rest,
-          ticketnumber: ticketNumber ?? rest.ticketnumber,
-          customername: customerName ?? rest.customername,
-          bikemodel: bikeModel ?? rest.bikemodel,
+          history: rest.history || [],
+          timeline: rest.timeline || [],
           tagnumber: tagNumber ?? rest.tagnumber ?? null,
         };
 
@@ -148,13 +145,10 @@ export function createDB(sb, Utils) {
 
     update: async (id, updates) => {
       try {
-        const { ticketNumber, customerName, bikeModel, tagNumber, ...rest } = updates;
+        const { tagNumber, ...rest } = updates;
         const updateData = {
           ...rest,
           updatedat: new Date().toISOString(),
-          ...(ticketNumber !== undefined && { ticketnumber: ticketNumber }),
-          ...(customerName !== undefined && { customername: customerName }),
-          ...(bikeModel !== undefined && { bikemodel: bikeModel }),
           ...(tagNumber !== undefined && { tagnumber: tagNumber }),
         };
 
