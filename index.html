@@ -131,8 +131,6 @@
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
 
-    <!-- Last Updated Indicator -->
-    <div id="last-updated-indicator" style="position:fixed;top:10px;left:50%;transform:translateX(-50%);font-size:12px;color:#666;background:rgba(255,255,255,0.75);padding:2px 8px;border-radius:4px;direction:rtl;z-index:9999;pointer-events:none;white-space:nowrap;"></div>
 
     <!-- LOGIN SCREEN -->
     <div id="login-screen">
@@ -207,9 +205,12 @@
                 <div id="view-dashboard" class="view-section active">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold text-gray-800">דשבורד ניהולי</h2>
-                        <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium">
-                            <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
-                        </button>
+                        <div class="flex flex-col items-stretch gap-2">
+                            <div id="last-updated-indicator" style="font-size:12px;color:#666;background:rgba(255,255,255,0.75);padding:2px 8px;border-radius:4px;direction:rtl;white-space:nowrap;text-align:center;"></div>
+                            <button onclick="window.app.openCreateTicket()" class="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm text-sm font-medium w-full">
+                                <i data-lucide="plus" class="w-4 h-4"></i> תיקון חדש
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Section: Repairs -->
