@@ -182,7 +182,7 @@ const DB = createDB(sb, Utils);
                         try {
                             await window.app.loadTickets(true);
                             const currentView = document.querySelector('.view-section.active')?.id;
-                            if (currentView === 'view-dashboard') window.app.renderDashboard();
+                            if (currentView === 'view-dashboard') window.app.refreshDashboard();
                             if (currentView === 'view-archive') window.app.renderArchive();
                         } catch (e) {
                             console.error('Focus fetch error:', e);
@@ -435,7 +435,7 @@ const DB = createDB(sb, Utils);
             try {
                 await window.app.loadTickets(true);
                 const currentView = document.querySelector('.view-section.active')?.id;
-                if (currentView === 'view-dashboard') window.app.renderDashboard();
+                if (currentView === 'view-dashboard') window.app.refreshDashboard();
                 if (currentView === 'view-archive') window.app.renderArchive();
                 Utils.showToast('הנתונים עודכנו', 'success');
             } catch (e) {
@@ -477,7 +477,7 @@ const DB = createDB(sb, Utils);
                     // whichever view is currently visible (dashboard on first load)
                     window.app.renderTickets();
                     const currentView = document.querySelector('.view-section.active')?.id;
-                    if (currentView === 'view-dashboard') window.app.renderDashboard();
+                    if (currentView === 'view-dashboard') window.app.refreshDashboard();
                     if (currentView === 'view-archive')  window.app.renderArchive();
                 } else {
                     window.app.appendTicketRows(data);
@@ -524,11 +524,15 @@ const DB = createDB(sb, Utils);
             lucide.createIcons();
         },
 
-        renderDashboard: () => {
+        renderDashboard: (globalCounts = null) => {
             // סינון ארכיון מהדשבורד (גם לפי דגל וגם לפי סטטוס)
             const t = window.app.tickets.filter(x => !x.is_archived && x.status !== 'archived');
-            
-            const counts = {
+
+            // Use global DB counts for KPI cards/chart when available; fall back to loaded page
+            const counts = globalCounts ? {
+                ...globalCounts,
+                second_hand: window.app.bikes.length
+            } : {
                 new: t.filter(x => x.status === 'new').length,
                 new_bike: t.filter(x => x.status === 'new_bike').length,
                 test_bike: t.filter(x => x.status === 'test_bike').length,
@@ -688,6 +692,11 @@ const DB = createDB(sb, Utils);
                 }).join('');
                 lucide.createIcons();
             }
+        },
+
+        refreshDashboard: async () => {
+            const counts = await DB.getGlobalStatusCounts();
+            window.app.renderDashboard(counts);
         },
 
         renderTickets: () => {
@@ -1131,7 +1140,7 @@ const router = {
       if(btn.dataset.target === target) btn.classList.add('bg-blue-50', 'text-blue-700');
       else btn.classList.remove('bg-blue-50', 'text-blue-700');
     });
-    if(target === 'dashboard') window.app.renderDashboard();
+    if(target === 'dashboard') window.app.refreshDashboard();
     if(target === 'tickets') window.app.renderTickets();
     if(target === 'customers') window.app.renderCustomers();
     if(target === 'secondhand') window.app.renderBikes();

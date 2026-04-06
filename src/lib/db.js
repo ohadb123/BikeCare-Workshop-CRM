@@ -178,6 +178,35 @@ export function createDB(sb, Utils) {
       }
     },
 
+    getGlobalStatusCounts: async () => {
+      if (!sb) return null;
+      try {
+        const { data, error } = await sb
+          .from('tickets')
+          .select('status')
+          .eq('is_archived', false)
+          .neq('status', 'archived');
+
+        if (error) {
+          console.error('getGlobalStatusCounts error:', error);
+          return null;
+        }
+
+        const counts = {
+          new: 0, new_bike: 0, test_bike: 0,
+          in_progress: 0, waiting_approval: 0,
+          completed: 0, cancelled: 0
+        };
+        for (const row of data || []) {
+          if (counts[row.status] !== undefined) counts[row.status]++;
+        }
+        return counts;
+      } catch (e) {
+        console.error('getGlobalStatusCounts error:', e);
+        return null;
+      }
+    },
+
     // Initialize migration on first use
     init: migrateLegacyData
   };
