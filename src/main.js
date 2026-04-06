@@ -628,6 +628,10 @@ const DB = createDB(sb, Utils);
                                             return {
                                                 text: `${label} - ${val} (${pct}%)`,
                                                 fillStyle: data.datasets[0].backgroundColor[i],
+                                                strokeStyle: 'transparent',
+                                                lineWidth: 0,
+                                                fontColor: '#374151',
+                                                color: '#374151',
                                                 hidden: false,
                                                 index: i
                                             };
