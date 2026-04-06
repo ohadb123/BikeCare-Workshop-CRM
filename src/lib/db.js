@@ -64,10 +64,10 @@ export function createDB(sb, Utils) {
           const term = searchTerm.trim();
           const isNumeric = /^\d+$/.test(term);
 
-          let orQuery = `customername.ilike.%${term}%,bikemodel.ilike.%${term}%,tagnumber.ilike.%${term}%,customerphone.ilike.%${term}%`;
+          let orQuery = `"customerName".ilike.%${term}%,"bikeModel".ilike.%${term}%,tagnumber.ilike.%${term}%,"customerPhone".ilike.%${term}%`;
 
           if (isNumeric) {
-            orQuery += `,ticketnumber.eq.${term}`;
+            orQuery += `,"ticketNumber".eq.${term}`;
           }
 
           query = query.or(orQuery);
