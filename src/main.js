@@ -446,6 +446,31 @@ const DB = createDB(sb, Utils);
             }
         },
 
+        loadAllTickets: async () => {
+            const btn     = document.getElementById('load-all-btn');
+            const btnText = document.getElementById('load-all-btn-text');
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.textContent = 'טוען...';
+            try {
+                const requestId = getRequestId();
+                const data = await DB.getAll({ limit: 1000, offset: 0, searchTerm: window.app._ticketsSearchTerm });
+                if (requestId !== currentRequestId || !window.app.user) return;
+                window.app.tickets          = data;
+                window.app._ticketsOffset   = data.length;
+                window.app._ticketsHasMore  = false;   // disable further scroll triggers
+                window.app._lastFetchTs     = Date.now();
+                window.app.updateLastUpdatedTimestamp();
+                window.app.renderTickets();
+                Utils.showToast(`נטענו ${data.length} כרטיסים`, 'success');
+            } catch (e) {
+                console.error('loadAllTickets error:', e);
+                Utils.showToast('שגיאה בטעינת הקטלוג המלא', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = 'טען קטלוג מלא';
+            }
+        },
+
         // ── Pagination helpers ──────────────────────────────────────────────
         loadTickets: async (reset = false) => {
             if (!reset && (window.app._ticketsLoading || !window.app._ticketsHasMore)) return;
