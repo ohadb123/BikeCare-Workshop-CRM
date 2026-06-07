@@ -332,9 +332,15 @@
                     </div>
 
                     <div class="bg-white p-4 rounded-lg shadow-sm mb-4 space-y-4 md:space-y-0 md:flex md:items-center md:gap-4 flex-wrap">
-                        <div class="relative flex-1 min-w-[200px]">
-                            <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
-                            <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם, מספר או תג..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        <div class="relative flex-1 min-w-[200px] flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <i data-lucide="search" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4"></i>
+                                <input type="text" id="tickets-search" placeholder="חיפוש לפי שם, טלפון, דגם, מספר או תג..." class="w-full pl-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <button id="load-all-btn" onclick="window.app.loadAllTickets()" class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors whitespace-nowrap shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                <span id="load-all-btn-text">טען קטלוג מלא</span>
+                            </button>
                         </div>
                         <div class="flex items-center gap-2">
                             <i data-lucide="filter" class="text-gray-500 w-4 h-4"></i>
